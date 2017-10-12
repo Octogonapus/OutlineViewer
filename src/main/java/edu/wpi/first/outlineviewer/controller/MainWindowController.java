@@ -3,6 +3,7 @@ package edu.wpi.first.outlineviewer.controller;
 import edu.wpi.first.networktables.NetworkTableEntry;
 import edu.wpi.first.networktables.NetworkTableValue;
 import edu.wpi.first.networktables.PersistentException;
+import edu.wpi.first.outlineviewer.NetworkTableRecorder;
 import edu.wpi.first.outlineviewer.NetworkTableUtilities;
 import edu.wpi.first.outlineviewer.model.NetworkTableTreeRow;
 import edu.wpi.first.outlineviewer.model.TreeEntry;
@@ -18,6 +19,7 @@ import edu.wpi.first.outlineviewer.view.dialog.AddNumberDialog;
 import edu.wpi.first.outlineviewer.view.dialog.AddStringArrayDialog;
 import edu.wpi.first.outlineviewer.view.dialog.AddStringDialog;
 import edu.wpi.first.outlineviewer.view.dialog.PreferencesDialog;
+import java.nio.file.Paths;
 import javafx.beans.property.ReadOnlyStringWrapper;
 import javafx.fxml.FXML;
 import javafx.scene.control.TreeItem;
@@ -63,6 +65,8 @@ public class MainWindowController {
   private TreeTableColumn<TreeRow, Object> valueColumn;
   @FXML
   private TreeTableColumn<TreeRow, String> typeColumn;
+
+  private NetworkTableRecorder ntRecorder;
 
   @FXML
   @SuppressWarnings("PMD.AccessorMethodGeneration")
@@ -181,6 +185,9 @@ public class MainWindowController {
       tableView.setContextMenu(cm);
       cm.show(tableView, contextMenuEvent.getScreenX(), contextMenuEvent.getScreenY());
     });
+
+    ntRecorder = new NetworkTableRecorder(Paths.get("/home/linux/testRecording3.txt"));
+    ntRecorder.start();
   }
 
   /**
@@ -304,7 +311,13 @@ public class MainWindowController {
   }
 
   @FXML
+  @SuppressWarnings("PMD")
   private void exitProgram() {
+    try {
+      ntRecorder.saveAndJoin();
+    } catch (InterruptedException | IOException e) {
+      e.printStackTrace();
+    }
     root.getScene().getWindow().hide();
   }
 
