@@ -21,7 +21,7 @@
             <Menu mnemonicParsing="false" text="File" id="fileMenu">
                 <MenuItem onAction="#loadState" text="Load state" id="loadStateButton" accelerator="SHORTCUT+O"/>
                 <MenuItem onAction="#saveState" text="Save state" id="saveStateButton" accelerator="SHORTCUT+S"/>
-                <MenuItem onAction="#saveNTRecord" text="Save Recording" id="saveNTRecordButton" />
+                <MenuItem onAction="#saveNTRecord" text="Save Recording" id="saveNTRecordButton" accelerator="SHORTCUT+R" />
                 <SeparatorMenuItem />
                 <MenuItem onAction="#showPreferences" text="Preferences" id="preferencesMenuButton" accelerator="SHORTCUT+,"/>
                 <MenuItem onAction="#exitProgram" text="Exit" id="exitMenuButton" accelerator="SHORTCUT+q"/>
