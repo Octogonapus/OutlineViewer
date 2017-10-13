@@ -4,10 +4,13 @@ import com.google.common.base.Charsets;
 import com.google.common.io.CharSink;
 import com.google.common.io.FileWriteMode;
 import com.google.common.io.Files;
+import edu.wpi.first.networktables.NetworkTableValue;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.List;
 import javafx.beans.property.SimpleObjectProperty;
 import javafx.stage.FileChooser;
 import javafx.stage.Window;
@@ -21,12 +24,14 @@ public class NetworkTableRecorder extends Thread {
   private boolean isPaused;
   //State of the overall recorder (only written to in this class, not read from)
   private final SimpleObjectProperty<Thread.State> state;
+  private final List<NetworkTableValue> values;
 
   public NetworkTableRecorder() {
     super();
     keepRunning = true;
     isPaused = false;
     state = new SimpleObjectProperty<>(State.NEW);
+    values = new ArrayList<>();
   }
 
   @Override
@@ -43,7 +48,7 @@ public class NetworkTableRecorder extends Thread {
 
       //Else we aren't paused so keep recording
       state.set(State.RUNNABLE);
-      System.out.println("Foo!");
+      values.add(NetworkTableValue.makeString("Hello, World!"));
       waitTimestep();
     }
 
@@ -116,8 +121,13 @@ public class NetworkTableRecorder extends Thread {
     //Write to file
     try {
       CharSink sink = Files.asCharSink(file, Charsets.UTF_8, FileWriteMode.APPEND);
-      //TODO: Write data to sink
-      sink.write("Hello, world!");
+      values.forEach(val -> {
+        try {
+          sink.write(val.getString() + "\n");
+        } catch (IOException e) {
+          e.printStackTrace();
+        }
+      });
     } finally {
       join();
     }
