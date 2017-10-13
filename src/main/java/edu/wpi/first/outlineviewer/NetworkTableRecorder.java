@@ -14,6 +14,8 @@ import javafx.stage.FileChooser;
 import javafx.stage.Window;
 
 public class NetworkTableRecorder extends Thread {
+  private static final String NTR_EXTENSION = ".ntr";
+
   //Keep running the thread, false means kill and exit
   private boolean keepRunning;
   //Whether the thread should pause recording and wait
@@ -32,33 +34,36 @@ public class NetworkTableRecorder extends Thread {
   @SuppressWarnings("PMD")
   public void run() {
     System.out.println("RUN!");
-//    while (keepRunning) {
-//      //Paused means stop recording and wait
-//      if (isPaused) {
-//        state.set(State.WAITING);
-//        waitTimestep();
-//        continue;
-//      }
-//
-//      //Else we aren't paused so keep recording
-//      state.set(State.RUNNABLE);
-//      System.out.println("Foo!");
-//      waitTimestep();
-//    }
-//
-//    state.set(State.TERMINATED);
+    //    while (keepRunning) {
+    //      //Paused means stop recording and wait
+    //      if (isPaused) {
+    //        state.set(State.WAITING);
+    //        waitTimestep();
+    //        continue;
+    //      }
+    //
+    //      //Else we aren't paused so keep recording
+    //      state.set(State.RUNNABLE);
+    //      System.out.println("Foo!");
+    //      waitTimestep();
+    //    }
+    //
+    //    state.set(State.TERMINATED);
   }
 
   /**
    * Stop recording, save the recorded data to a file, and join the thread. Shows the user a
    * FileChooser dialog to get the file path.
+   *
    * @throws InterruptedException Waiting for the data recorder to stop could be interrupted
-   * @throws IOException          Writing to the file could error
+   * @throws IOException Writing to the file could error
    */
   @SuppressWarnings("PMD")
   public void saveAndJoin(Window window) throws IOException, InterruptedException {
     FileChooser chooser = new FileChooser();
     chooser.setTitle("Save NetworkTables Recording");
+    chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("NetworkTables Recording",
+        "*" + NTR_EXTENSION)); // "*.ntr"
     File result = chooser.showSaveDialog(window);
     if (result != null) {
       //Null means the user hit cancel or didn't select a file and therefore doesn't want to save
@@ -69,8 +74,9 @@ public class NetworkTableRecorder extends Thread {
 
   /**
    * Stop recording, save the recorded data to a file, and join the thread.
+   *
    * @throws InterruptedException Waiting for the data recorder to stop could be interrupted
-   * @throws IOException          Writing to the file could error
+   * @throws IOException Writing to the file could error
    */
   @SuppressWarnings("PMD")
   public void saveAndJoin(String fileName) throws IOException, InterruptedException {
@@ -79,11 +85,17 @@ public class NetworkTableRecorder extends Thread {
 
   /**
    * Stop recording, save the recorded data to a file, and join the thread.
+   *
    * @throws InterruptedException Waiting for the data recorder to stop could be interrupted
-   * @throws IOException          Writing to the file could error
+   * @throws IOException Writing to the file could error
    */
   @SuppressWarnings("PMD")
   public void saveAndJoin(Path path) throws InterruptedException, IOException {
+    //Add extension if it isn't there
+    if (!path.endsWith(NTR_EXTENSION)) {
+      path.resolveSibling(path.getFileName() + NTR_EXTENSION);
+    }
+
     //Stop running and wait for data to stop
     keepRunning = false;
     //    while (!state.get().equals(State.TERMINATED)) {
@@ -100,8 +112,6 @@ public class NetworkTableRecorder extends Thread {
       Files.createParentDirs(file);
       Files.touch(file);
     }
-//    FileChannel channel = new RandomAccessFile(file, "rw").getChannel();
-//    FileLock lock = channel.tryLock();
 
     //Write to file
     try {
@@ -112,9 +122,6 @@ public class NetworkTableRecorder extends Thread {
       //TODO: Tell the user the file is in use
       e.printStackTrace();
     } finally {
-//      if (lock != null) {
-//        lock.release();
-//      }
       join();
     }
   }
