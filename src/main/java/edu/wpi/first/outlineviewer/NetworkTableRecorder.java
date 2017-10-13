@@ -32,22 +32,23 @@ public class NetworkTableRecorder extends Thread {
   @Override
   @SuppressWarnings("PMD")
   public void run() {
-    System.out.println("RUN!");
-    //    while (keepRunning) {
-    //      //Paused means stop recording and wait
-    //      if (isPaused) {
-    //        state.set(State.WAITING);
-    //        waitTimestep();
-    //        continue;
-    //      }
-    //
-    //      //Else we aren't paused so keep recording
-    //      state.set(State.RUNNABLE);
-    //      System.out.println("Foo!");
-    //      waitTimestep();
-    //    }
-    //
-    //    state.set(State.TERMINATED);
+    //    System.out.println("RUN!");
+    while (keepRunning) {
+      //Paused means stop recording and wait
+      if (isPaused) {
+        state.set(State.WAITING);
+        waitTimestep();
+        continue;
+      }
+
+      //Else we aren't paused so keep recording
+      state.set(State.RUNNABLE);
+      System.out.println("Foo!");
+      waitTimestep();
+    }
+
+    System.out.println("Terminated!");
+    state.set(State.TERMINATED);
   }
 
   /**
@@ -97,13 +98,13 @@ public class NetworkTableRecorder extends Thread {
 
     //Stop running and wait for data to stop
     keepRunning = false;
-    //    while (!state.get().equals(State.TERMINATED)) {
-    //      try {
-    //        sleep(1);
-    //      } catch (InterruptedException e) {
-    //        e.printStackTrace();
-    //      }
-    //    }
+    while (!state.get().equals(State.TERMINATED)) {
+      try {
+        sleep(1);
+      } catch (InterruptedException e) {
+        e.printStackTrace();
+      }
+    }
 
     //Get lock on file
     File file = path.toFile();
@@ -147,7 +148,7 @@ public class NetworkTableRecorder extends Thread {
 
   private void waitTimestep() {
     try {
-      sleep(1);
+      sleep(1000);
     } catch (InterruptedException e) {
       e.printStackTrace();
     }
