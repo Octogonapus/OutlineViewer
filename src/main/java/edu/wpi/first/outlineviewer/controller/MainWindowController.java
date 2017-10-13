@@ -19,30 +19,28 @@ import edu.wpi.first.outlineviewer.view.dialog.AddNumberDialog;
 import edu.wpi.first.outlineviewer.view.dialog.AddStringArrayDialog;
 import edu.wpi.first.outlineviewer.view.dialog.AddStringDialog;
 import edu.wpi.first.outlineviewer.view.dialog.PreferencesDialog;
-import java.nio.file.Paths;
-import javafx.beans.property.ReadOnlyStringWrapper;
-import javafx.fxml.FXML;
-import javafx.scene.control.TreeItem;
-import javafx.scene.control.TreeTableColumn;
-import javafx.scene.control.SelectionMode;
-import javafx.scene.control.TreeTableView;
-import javafx.scene.control.TreeTableRow;
-import javafx.scene.control.ContextMenu;
-import javafx.scene.control.SeparatorMenuItem;
-import javafx.scene.control.MenuItem;
-import javafx.scene.control.ButtonType;
-import javafx.scene.control.Alert;
-import javafx.scene.control.cell.TreeItemPropertyValueFactory;
-import javafx.scene.input.KeyCode;
-import javafx.scene.input.MouseEvent;
-import javafx.scene.layout.Pane;
-import javafx.stage.FileChooser;
-
 import java.io.File;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
 import java.util.function.BiConsumer;
+import javafx.beans.property.ReadOnlyStringWrapper;
+import javafx.fxml.FXML;
+import javafx.scene.control.Alert;
+import javafx.scene.control.ButtonType;
+import javafx.scene.control.ContextMenu;
+import javafx.scene.control.MenuItem;
+import javafx.scene.control.SelectionMode;
+import javafx.scene.control.SeparatorMenuItem;
+import javafx.scene.control.TreeItem;
+import javafx.scene.control.TreeTableColumn;
+import javafx.scene.control.TreeTableRow;
+import javafx.scene.control.TreeTableView;
+import javafx.scene.control.cell.TreeItemPropertyValueFactory;
+import javafx.scene.input.KeyCode;
+import javafx.scene.input.MouseEvent;
+import javafx.scene.layout.Pane;
+import javafx.stage.FileChooser;
 import javafx.stage.Modality;
 import javafx.stage.StageStyle;
 
@@ -186,7 +184,7 @@ public class MainWindowController {
       cm.show(tableView, contextMenuEvent.getScreenX(), contextMenuEvent.getScreenY());
     });
 
-    ntRecorder = new NetworkTableRecorder(Paths.get("/home/linux/testRecording3.txt"));
+    ntRecorder = new NetworkTableRecorder();
     ntRecorder.start();
   }
 
@@ -293,7 +291,7 @@ public class MainWindowController {
   }
 
   @FXML
-  private void saveState()  {
+  private void saveState() {
     FileChooser fileChooser = new FileChooser();
     fileChooser.setTitle("Save NetworkTables State");
     fileChooser.setInitialFileName("networktables.ini");
@@ -311,13 +309,19 @@ public class MainWindowController {
   }
 
   @FXML
-  @SuppressWarnings("PMD")
-  private void exitProgram() {
+  private void saveNTRecord() {
     try {
-      ntRecorder.saveAndJoin();
-    } catch (InterruptedException | IOException e) {
+      ntRecorder.saveAndJoin(root.getScene().getWindow());
+    } catch (IOException e) {
+      e.printStackTrace();
+    } catch (InterruptedException e) {
       e.printStackTrace();
     }
+  }
+
+  @FXML
+  @SuppressWarnings("PMD")
+  private void exitProgram() {
     root.getScene().getWindow().hide();
   }
 
