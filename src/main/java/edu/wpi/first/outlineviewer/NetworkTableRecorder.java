@@ -6,7 +6,6 @@ import com.google.common.io.FileWriteMode;
 import com.google.common.io.Files;
 import java.io.File;
 import java.io.IOException;
-import java.nio.channels.OverlappingFileLockException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import javafx.beans.property.SimpleObjectProperty;
@@ -118,9 +117,6 @@ public class NetworkTableRecorder extends Thread {
       CharSink sink = Files.asCharSink(file, Charsets.UTF_8, FileWriteMode.APPEND);
       //TODO: Write data to sink
       sink.write("Hello, world!");
-    } catch (OverlappingFileLockException e) {
-      //TODO: Tell the user the file is in use
-      e.printStackTrace();
     } finally {
       join();
     }
