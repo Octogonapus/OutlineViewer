@@ -13,6 +13,7 @@ import com.google.common.io.FileWriteMode;
 import com.google.common.io.Files;
 import com.google.common.net.PercentEscaper;
 import edu.wpi.first.networktables.NetworkTableEntry;
+import edu.wpi.first.networktables.NetworkTableType;
 import edu.wpi.first.outlineviewer.model.EntryChange;
 import java.io.BufferedReader;
 import java.io.File;
@@ -22,9 +23,11 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.StringJoiner;
 import java.util.concurrent.ConcurrentHashMap;
@@ -32,6 +35,7 @@ import java.util.stream.Collectors;
 import javafx.beans.property.SimpleObjectProperty;
 import javafx.stage.FileChooser;
 import javafx.stage.Window;
+import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.text.StringEscapeUtils;
 import org.apache.commons.text.translate.AggregateTranslator;
 import org.apache.commons.text.translate.CharSequenceTranslator;
@@ -53,6 +57,7 @@ public class NetworkTableRecorder extends Thread {
   private final SimpleObjectProperty<Thread.State> state;
 
   private final ConcurrentHashMap<LocalDateTime, EntryChange> values;
+  private final ConcurrentHashMap<LocalDateTime, EntryChange> playback;
 
   public NetworkTableRecorder() {
     super();
@@ -61,6 +66,7 @@ public class NetworkTableRecorder extends Thread {
     isPaused = false;
     state = new SimpleObjectProperty<>(State.NEW);
     values = new ConcurrentHashMap<>();
+    playback = new ConcurrentHashMap<>();
   }
 
   @Override
@@ -75,16 +81,26 @@ public class NetworkTableRecorder extends Thread {
   @SuppressWarnings("PMD")
   public void run() {
     NetworkTableUtilities.getNetworkTableInstance().addEntryListener("", notification -> {
-      saveEntry(notification.getEntry().getName(), getValueAsString(notification.getEntry()));
+      if (state.get().equals(State.RUNNABLE)) {
+        saveEntry(notification.getEntry().getName(),
+            notification.getEntry().getType(),
+            getValueAsString(notification.getEntry()));
 
-      notification.getEntry().addListener(entryNotification -> {
-        if ((entryNotification.flags & kNew) != 0 || (entryNotification.flags & kUpdate) != 0) {
-          saveEntry(entryNotification.getEntry().getName(),
-              getValueAsString(entryNotification.getEntry()));
-        } else if ((entryNotification.flags & kDelete) != 0) {
-          saveEntry(entryNotification.getEntry().getName(), "", true);
-        }
-      }, kUpdate | kDelete);
+        notification.getEntry().addListener(entryNotification -> {
+          if (state.get().equals(State.RUNNABLE)) {
+            if ((entryNotification.flags & kNew) != 0 || (entryNotification.flags & kUpdate) != 0) {
+              saveEntry(entryNotification.getEntry().getName(),
+                  entryNotification.getEntry().getType(),
+                  getValueAsString(entryNotification.getEntry()));
+            } else if ((entryNotification.flags & kDelete) != 0) {
+              saveEntry(entryNotification.getEntry().getName(),
+                  entryNotification.getEntry().getType(),
+                  "",
+                  true);
+            }
+          }
+        }, kUpdate | kDelete);
+      }
     }, kNew);
 
     //Even though this loop doesn't do much, we need it to stop us from freezing
@@ -105,15 +121,15 @@ public class NetworkTableRecorder extends Thread {
     state.set(State.TERMINATED);
   }
 
-  private void saveEntry(String key, String newValue) {
-    saveEntry(key, newValue, false);
+  private void saveEntry(String key, NetworkTableType type, String newValue) {
+    saveEntry(key, type, newValue, false);
   }
 
-  private void saveEntry(String key, String newValue, boolean wasDeleted) {
+  private void saveEntry(String key, NetworkTableType type, String newValue, boolean wasDeleted) {
     if (wasDeleted) {
-      values.put(LocalDateTime.now(), new EntryChange(key, "[[DELETED]]"));
+      values.put(LocalDateTime.now(), new EntryChange(key, type, "[[DELETED]]"));
     } else {
-      values.put(LocalDateTime.now(), new EntryChange(key, newValue));
+      values.put(LocalDateTime.now(), new EntryChange(key, type, newValue));
     }
   }
 
@@ -193,9 +209,14 @@ public class NetworkTableRecorder extends Thread {
           .sorted()
           .forEachOrdered(key -> {
             try {
-              sink.write(StringEscapeUtils.escapeXSI(key.toString()) + ";"
-                  + StringEscapeUtils.escapeXSI(values.get(key).getName()) + ";"
-                  + StringEscapeUtils.escapeXSI(values.get(key).getNewValue()) + "\n");
+              sink.write(StringEscapeUtils.escapeXSI(key.toString())
+                  + ";"
+                  + StringEscapeUtils.escapeXSI(values.get(key).getName())
+                  + ";"
+                  + StringEscapeUtils.escapeXSI(String.valueOf(values.get(key).getTypeValue()))
+                  + ";"
+                  + StringEscapeUtils.escapeXSI(values.get(key).getNewValue())
+                  + "\n");
             } catch (IOException e) {
               e.printStackTrace();
             }
@@ -207,6 +228,7 @@ public class NetworkTableRecorder extends Thread {
 
   /**
    * Load a NetworkTables recording from a file and play it back.
+   *
    * @param file Recording file
    * @throws IOException Loading the file could produce an IOException
    */
@@ -221,21 +243,161 @@ public class NetworkTableRecorder extends Thread {
 
         String time;
         String key;
+        String type;
         String value;
 
-        time = findSubstring(line, 0, ';');
-        key = findSubstring(line, time.length() + 1, ';');
-        value = findSubstring(line, time.length() + key.length() + 2, ';');
+        time = findSubstring(line,
+            0,
+            ';');
+        key = findSubstring(line,
+            time.length() + 1,
+            ';');
+        type = findSubstring(line,
+            time.length() + key.length() + 2,
+            ';');
+        value = findSubstring(line,
+            time.length() + key.length() + type.length() + 3,
+            ';');
 
         time = StringEscapeUtils.unescapeXSI(time);
         key = StringEscapeUtils.unescapeXSI(key);
+        type = StringEscapeUtils.unescapeXSI(type);
         value = StringEscapeUtils.unescapeXSI(value);
+
+        playback.put(LocalDateTime.parse(time),
+            new EntryChange(key,
+                NetworkTableType.getFromInt(Integer.parseInt(type)),
+                value));
       }
     }
+
+    pause();
+    startPlayback();
+  }
+
+  private void startPlayback() {
+    playback.keySet()
+        .parallelStream()
+        .sorted()
+        .forEachOrdered(time -> {
+          EntryChange change = playback.get(time);
+          NetworkTableEntry entry = NetworkTableUtilities.getNetworkTableInstance()
+              .getEntry(change.getName());
+
+          switch (change.getType()) {
+            case kDouble:
+              entry.setDouble(Double.parseDouble(change.getNewValue()));
+              break;
+
+            case kString:
+              entry.setString(change.getNewValue());
+              break;
+
+            case kBoolean:
+              entry.setBoolean(Boolean.parseBoolean(change.getNewValue()));
+              break;
+
+            case kDoubleArray:
+              entry.setDoubleArray(parseDoubleArray(change.getNewValue()));
+              break;
+
+            case kStringArray:
+              entry.setStringArray(parseStringArray(change.getNewValue()));
+              break;
+
+            case kBooleanArray:
+              entry.setBooleanArray(parseBooleanArray(change.getNewValue()));
+              break;
+
+            case kRaw:
+              entry.setRaw(parseByteArray(change.getNewValue()));
+              break;
+
+            default:
+              break;
+          }
+        });
+  }
+
+  /**
+   * Parses a comma delimited double array from a String.
+   *
+   * @param source double array String
+   * @return double array version of string
+   */
+  private double[] parseDoubleArray(String source) {
+    List<Double> doubles = new ArrayList<>();
+
+    for (int i = 0; i < source.length(); i++) {
+      String sub = findSubstring(source, i, ',');
+      if (!sub.equals("")) {
+        doubles.add(Double.parseDouble(sub));
+      }
+    }
+
+    return ArrayUtils.toPrimitive(doubles.toArray(new Double[doubles.size()]));
+  }
+
+  /**
+   * Parses a comma delimited string array from a String.
+   *
+   * @param source string array String
+   * @return string array version of string
+   */
+  private String[] parseStringArray(String source) {
+    List<String> strings = new ArrayList<>();
+
+    for (int i = 0; i < source.length(); i++) {
+      String sub = findSubstring(source, i, ',');
+      if (!sub.equals("")) {
+        strings.add(sub);
+      }
+    }
+
+    return strings.toArray(new String[strings.size()]);
+  }
+
+  /**
+   * Parses a comma delimited boolean array from a String.
+   *
+   * @param source boolean array String
+   * @return boolean array version of string
+   */
+  private boolean[] parseBooleanArray(String source) {
+    List<Boolean> booleans = new ArrayList<>();
+
+    for (int i = 0; i < source.length(); i++) {
+      String sub = findSubstring(source, i, ',');
+      if (!sub.equals("")) {
+        booleans.add(Boolean.parseBoolean(sub));
+      }
+    }
+
+    return ArrayUtils.toPrimitive(booleans.toArray(new Boolean[booleans.size()]));
+  }
+
+  /**
+   * Parses a comma delimited byte array from a String.
+   *
+   * @param source byte array String
+   * @return byte array version of string
+   */
+  private byte[] parseByteArray(String source) {
+    List<Byte> bytes = new ArrayList<>();
+
+    for (int i = 0; i < source.length(); i++) {
+      String sub = findSubstring(source, i, ',');
+      if (!sub.equals("")) {
+        bytes.add(Byte.parseByte(sub));
+      }
+    }
+
+    return ArrayUtils.toPrimitive(bytes.toArray(new Byte[bytes.size()]));
   }
 
   /**
    * Find a substring inside a delimited string.
+   *
    * @param source String containing substring
    * @param start Start index inside string
    * @param delimiter Delimiter delimiting substrings
@@ -308,8 +470,8 @@ public class NetworkTableRecorder extends Thread {
 
       case kString:
         return entry.getString("");
-      case kBoolean:
 
+      case kBoolean:
         return String.valueOf(entry.getBoolean(false));
 
       case kDoubleArray:
