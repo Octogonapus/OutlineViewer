@@ -5,27 +5,45 @@ import static edu.wpi.first.networktables.EntryListenerFlags.kNew;
 import static edu.wpi.first.networktables.EntryListenerFlags.kUpdate;
 
 import com.google.common.base.Charsets;
+import com.google.common.escape.ArrayBasedUnicodeEscaper;
+import com.google.common.escape.Escaper;
+import com.google.common.escape.UnicodeEscaper;
 import com.google.common.io.CharSink;
 import com.google.common.io.FileWriteMode;
 import com.google.common.io.Files;
+import com.google.common.net.PercentEscaper;
 import edu.wpi.first.networktables.NetworkTableEntry;
 import edu.wpi.first.outlineviewer.model.EntryChange;
+import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileReader;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.LocalDateTime;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.StringJoiner;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 import javafx.beans.property.SimpleObjectProperty;
 import javafx.stage.FileChooser;
 import javafx.stage.Window;
+import org.apache.commons.text.StringEscapeUtils;
+import org.apache.commons.text.translate.AggregateTranslator;
+import org.apache.commons.text.translate.CharSequenceTranslator;
+import org.apache.commons.text.translate.EntityArrays;
+import org.apache.commons.text.translate.JavaUnicodeEscaper;
+import org.apache.commons.text.translate.LookupTranslator;
+import org.apache.commons.text.translate.OctalUnescaper;
+import org.apache.commons.text.translate.UnicodeUnescaper;
 
 public class NetworkTableRecorder extends Thread {
 
-  private static final String NTR_EXTENSION = ".ntr";
+  public static final String NTR_EXTENSION = ".ntr";
 
   //Keep running the thread, false means kill and exit
   private boolean keepRunning;
@@ -175,9 +193,9 @@ public class NetworkTableRecorder extends Thread {
           .sorted()
           .forEachOrdered(key -> {
             try {
-              sink.write(key + ","
-                  + values.get(key).getName() + ","
-                  + values.get(key).getNewValue() + "\n");
+              sink.write(StringEscapeUtils.escapeXSI(key.toString()) + ";"
+                  + StringEscapeUtils.escapeXSI(values.get(key).getName()) + ";"
+                  + StringEscapeUtils.escapeXSI(values.get(key).getNewValue()) + "\n");
             } catch (IOException e) {
               e.printStackTrace();
             }
@@ -185,6 +203,66 @@ public class NetworkTableRecorder extends Thread {
     } finally {
       join();
     }
+  }
+
+  /**
+   * Load a NetworkTables recording from a file and play it back.
+   * @param file Recording file
+   * @throws IOException Loading the file could produce an IOException
+   */
+  public void load(File file) throws IOException {
+    try (BufferedReader br = new BufferedReader(new FileReader(file))) {
+      String line;
+      int lineCount = 0;
+      while ((line = br.readLine()) != null) {
+        if (lineCount++ <= 1) {
+          continue;
+        }
+
+        String time;
+        String key;
+        String value;
+
+        time = findSubstring(line, 0, ';');
+        key = findSubstring(line, time.length() + 1, ';');
+        value = findSubstring(line, time.length() + key.length() + 2, ';');
+
+        time = StringEscapeUtils.unescapeXSI(time);
+        key = StringEscapeUtils.unescapeXSI(key);
+        value = StringEscapeUtils.unescapeXSI(value);
+      }
+    }
+  }
+
+  /**
+   * Find a substring inside a delimited string.
+   * @param source String containing substring
+   * @param start Start index inside string
+   * @param delimiter Delimiter delimiting substrings
+   * @return The substring, or empty if nothing was found
+   */
+  private String findSubstring(String source, int start, char delimiter) {
+    char[] chars = source.toCharArray();
+
+    for (int i = start; i < chars.length; i++) {
+      if (chars[i] == delimiter) {
+        //Found a delimiter
+        if (i == 0) {
+          //If we are on the first index, we don't need to check the previous character for an
+          //escape
+          return source.substring(start, i);
+        } else if (chars[i - 1] != '\\') {
+          //Otherwise, we need to check for an escape
+          return source.substring(start, i);
+        }
+      } else if (i == chars.length - 1) {
+        //Last index (i.e. should be a newline but toCharArray strips the newline) so return the
+        //substring because newline is the line delimiter
+        return source.substring(start, i + 1); //i + 1 so we include the last character
+      }
+    }
+
+    return "";
   }
 
   /**

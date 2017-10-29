@@ -66,6 +66,7 @@ dependencies {
     compile(group = "edu.wpi.first.wpiutil", name = "wpiutil-java", version = "3.+")
     compile(group = "org.controlsfx", name = "controlsfx", version = "8.40.14")
     compile(group = "com.google.guava", name = "guava", version = "23.0")
+    compile(group = "org.apache.commons", name = "commons-text", version = "1.1")
 
     runtime(group = "edu.wpi.first.ntcore", name = "ntcore-jni", version = "4.+", classifier = "all")
 

@@ -197,7 +197,6 @@ public class MainWindowController {
     });
 
     ntRecorder = new NetworkTableRecorder();
-    ntRecorder.start();
   }
 
   /**
@@ -321,11 +320,31 @@ public class MainWindowController {
   }
 
   @FXML
+  private void startNTRecord() {
+    ntRecorder.start();
+  }
+
+  @FXML
   private void saveNTRecord() {
     try {
       ntRecorder.saveAndJoin(root.getScene().getWindow());
     } catch (IOException | InterruptedException e) {
       e.printStackTrace();
+    }
+  }
+
+  @FXML
+  private void loadNTRecord() {
+    FileChooser fileChooser = new FileChooser();
+    fileChooser.setTitle("Load NetworkTables Recording");
+    fileChooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("NetworkTables Recording",
+        "*" + NetworkTableRecorder.NTR_EXTENSION));
+    File selected = fileChooser.showOpenDialog(root.getScene().getWindow());
+    if (selected != null) {
+      try {
+        ntRecorder.load(selected);
+      } catch (IOException ignored) {
+      }
     }
   }
 
