@@ -248,16 +248,23 @@ public class NetworkTableRecorder extends Thread {
 
         time = findSubstring(line,
             0,
-            ';');
+            ';',
+            true);
+
         key = findSubstring(line,
             time.length() + 1,
-            ';');
+            ';',
+            true);
+
         type = findSubstring(line,
             time.length() + key.length() + 2,
-            ';');
+            ';',
+            true);
+
         value = findSubstring(line,
             time.length() + key.length() + type.length() + 3,
-            ';');
+            ';',
+            true);
 
         time = StringEscapeUtils.unescapeXSI(time);
         key = StringEscapeUtils.unescapeXSI(key);
@@ -328,10 +335,13 @@ public class NetworkTableRecorder extends Thread {
   private double[] parseDoubleArray(String source) {
     List<Double> doubles = new ArrayList<>();
 
-    for (int i = 0; i < source.length(); i++) {
-      String sub = findSubstring(source, i, ',');
+    for (int i = 0; i < source.length();) {
+      String sub = findSubstring(source, i, ',', false);
       if (!sub.equals("")) {
         doubles.add(Double.parseDouble(sub));
+        i += sub.length() + 1;
+      } else {
+        i++;
       }
     }
 
@@ -347,10 +357,13 @@ public class NetworkTableRecorder extends Thread {
   private String[] parseStringArray(String source) {
     List<String> strings = new ArrayList<>();
 
-    for (int i = 0; i < source.length(); i++) {
-      String sub = findSubstring(source, i, ',');
+    for (int i = 0; i < source.length();) {
+      String sub = findSubstring(source, i, ',', false);
       if (!sub.equals("")) {
         strings.add(sub);
+        i += sub.length() + 1;
+      } else {
+        i++;
       }
     }
 
@@ -366,10 +379,22 @@ public class NetworkTableRecorder extends Thread {
   private boolean[] parseBooleanArray(String source) {
     List<Boolean> booleans = new ArrayList<>();
 
-    for (int i = 0; i < source.length(); i++) {
-      String sub = findSubstring(source, i, ',');
+    for (int i = 0; i < source.length();) {
+      String sub = findSubstring(source, i, ',', false);
+      String val = sub;
+
+      try {
+        if (Integer.parseInt(sub) == 1) {
+          val = "true";
+        }
+      } catch (NumberFormatException ignored) {
+      }
+
       if (!sub.equals("")) {
-        booleans.add(Boolean.parseBoolean(sub));
+        booleans.add(Boolean.parseBoolean(val));
+        i += sub.length() + 1;
+      } else {
+        i++;
       }
     }
 
@@ -385,10 +410,13 @@ public class NetworkTableRecorder extends Thread {
   private byte[] parseByteArray(String source) {
     List<Byte> bytes = new ArrayList<>();
 
-    for (int i = 0; i < source.length(); i++) {
-      String sub = findSubstring(source, i, ',');
+    for (int i = 0; i < source.length();) {
+      String sub = findSubstring(source, i, ',', false);
       if (!sub.equals("")) {
         bytes.add(Byte.parseByte(sub));
+        i += sub.length() + 1;
+      } else {
+        i++;
       }
     }
 
@@ -403,7 +431,7 @@ public class NetworkTableRecorder extends Thread {
    * @param delimiter Delimiter delimiting substrings
    * @return The substring, or empty if nothing was found
    */
-  private String findSubstring(String source, int start, char delimiter) {
+  private String findSubstring(String source, int start, char delimiter, boolean checkForEscape) {
     char[] chars = source.toCharArray();
 
     for (int i = start; i < chars.length; i++) {
@@ -413,7 +441,7 @@ public class NetworkTableRecorder extends Thread {
           //If we are on the first index, we don't need to check the previous character for an
           //escape
           return source.substring(start, i);
-        } else if (chars[i - 1] != '\\') {
+        } else if (!checkForEscape || chars[i - 1] != '\\') {
           //Otherwise, we need to check for an escape
           return source.substring(start, i);
         }
