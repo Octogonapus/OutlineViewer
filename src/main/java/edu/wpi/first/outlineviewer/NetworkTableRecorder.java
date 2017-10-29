@@ -9,7 +9,7 @@ import com.google.common.io.CharSink;
 import com.google.common.io.FileWriteMode;
 import com.google.common.io.Files;
 import edu.wpi.first.networktables.NetworkTableEntry;
-import edu.wpi.first.outlineviewer.model.NTRecord;
+import edu.wpi.first.outlineviewer.model.EntryChange;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
@@ -17,6 +17,7 @@ import java.nio.file.Paths;
 import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.StringJoiner;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 import javafx.beans.property.SimpleObjectProperty;
 import javafx.stage.FileChooser;
@@ -33,7 +34,7 @@ public class NetworkTableRecorder extends Thread {
   //State of the overall recorder (only written to in this class, not read from)
   private final SimpleObjectProperty<Thread.State> state;
 
-  private final NTRecord values;
+  private final ConcurrentHashMap<LocalDateTime, EntryChange> values;
 
   public NetworkTableRecorder() {
     super();
@@ -41,7 +42,15 @@ public class NetworkTableRecorder extends Thread {
     keepRunning = true;
     isPaused = false;
     state = new SimpleObjectProperty<>(State.NEW);
-    values = new NTRecord();
+    values = new ConcurrentHashMap<>();
+  }
+
+  @Override
+  public synchronized void start() {
+    try {
+      super.start();
+    } catch (IllegalThreadStateException ignored) {
+    }
   }
 
   @Override
@@ -55,7 +64,7 @@ public class NetworkTableRecorder extends Thread {
           saveEntry(entryNotification.getEntry().getName(),
               getValueAsString(entryNotification.getEntry()));
         } else if ((entryNotification.flags & kDelete) != 0) {
-          saveEntry(entryNotification.getEntry().getName(), "[[DELETED]]");
+          saveEntry(entryNotification.getEntry().getName(), "", true);
         }
       }, kUpdate | kDelete);
     }, kNew);
@@ -78,9 +87,15 @@ public class NetworkTableRecorder extends Thread {
     state.set(State.TERMINATED);
   }
 
-  private void saveEntry(String key, String val) {
-    if (!val.equals("")) {
-      values.put(key, val);
+  private void saveEntry(String key, String newValue) {
+    saveEntry(key, newValue, false);
+  }
+
+  private void saveEntry(String key, String newValue, boolean wasDeleted) {
+    if (wasDeleted) {
+      values.put(LocalDateTime.now(), new EntryChange(key, "[[DELETED]]"));
+    } else {
+      values.put(LocalDateTime.now(), new EntryChange(key, newValue));
     }
   }
 
@@ -155,13 +170,18 @@ public class NetworkTableRecorder extends Thread {
       sink.write("[[DATE: " + LocalDateTime.now() + "]]\n");
 
       //Data
-      values.forEach((key, valList) -> valList.forEach(elem -> {
-        try {
-          sink.write(key + " : " + elem + "\n");
-        } catch (IOException e) {
-          e.printStackTrace();
-        }
-      }));
+      values.keySet()
+          .parallelStream()
+          .sorted()
+          .forEachOrdered(key -> {
+            try {
+              sink.write(key + ","
+                  + values.get(key).getName() + ","
+                  + values.get(key).getNewValue() + "\n");
+            } catch (IOException e) {
+              e.printStackTrace();
+            }
+          });
     } finally {
       join();
     }
@@ -193,8 +213,7 @@ public class NetworkTableRecorder extends Thread {
   private void waitTimestep() {
     try {
       sleep(1000);
-    } catch (InterruptedException e) {
-      e.printStackTrace();
+    } catch (InterruptedException ignored) {
     }
   }
 
