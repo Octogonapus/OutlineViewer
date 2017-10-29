@@ -9,7 +9,6 @@ import com.google.common.io.CharSink;
 import com.google.common.io.FileWriteMode;
 import com.google.common.io.Files;
 import edu.wpi.first.networktables.NetworkTableEntry;
-import edu.wpi.first.networktables.NetworkTableValue;
 import edu.wpi.first.outlineviewer.model.NTRecord;
 import java.io.File;
 import java.io.IOException;
@@ -18,7 +17,6 @@ import java.nio.file.Paths;
 import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.StringJoiner;
-import java.util.stream.Collector;
 import java.util.stream.Collectors;
 import javafx.beans.property.SimpleObjectProperty;
 import javafx.stage.FileChooser;
@@ -48,36 +46,43 @@ public class NetworkTableRecorder extends Thread {
     switch (entry.getType()) {
       case kDouble:
         return String.valueOf(entry.getDouble(0));
+
       case kString:
         return entry.getString("");
       case kBoolean:
+
         return String.valueOf(entry.getBoolean(false));
+
       case kDoubleArray:
         return Arrays.stream(entry.getDoubleArray(new Double[]{0.0}))
             .mapToDouble(Double::doubleValue)
             .mapToObj(String::valueOf)
             .collect(Collectors.joining(","));
+
       case kStringArray: {
-        String data[] = entry.getStringArray(new String[]{""});
+        String[] data = entry.getStringArray(new String[]{""});
         StringJoiner joiner = new StringJoiner(",");
         for (String datum : data) {
           joiner.add(datum);
         }
         return joiner.toString();
       }
+
       case kBooleanArray:
         return Arrays.stream(entry.getBooleanArray(new Boolean[]{false}))
-            .mapToInt(val -> !val ? 0 : 1)
+            .mapToInt(val -> val ? 1 : 0)
             .mapToObj(String::valueOf)
             .collect(Collectors.joining(","));
+
       case kRaw: {
-        byte data[] = entry.getRaw(new byte[]{0});
+        byte[] data = entry.getRaw(new byte[]{0});
         StringJoiner joiner = new StringJoiner(",");
         for (byte datum : data) {
           joiner.add(String.valueOf(datum));
         }
         return joiner.toString();
       }
+
       default:
         return "";
     }
