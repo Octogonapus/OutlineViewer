@@ -8,13 +8,18 @@ import com.google.common.base.Charsets;
 import com.google.common.io.CharSink;
 import com.google.common.io.FileWriteMode;
 import com.google.common.io.Files;
+import edu.wpi.first.networktables.NetworkTableEntry;
+import edu.wpi.first.networktables.NetworkTableValue;
 import edu.wpi.first.outlineviewer.model.NTRecord;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.LocalDateTime;
-import java.util.logging.Logger;
+import java.util.Arrays;
+import java.util.StringJoiner;
+import java.util.stream.Collector;
+import java.util.stream.Collectors;
 import javafx.beans.property.SimpleObjectProperty;
 import javafx.stage.FileChooser;
 import javafx.stage.Window;
@@ -39,19 +44,57 @@ public class NetworkTableRecorder extends Thread {
     values = new NTRecord();
   }
 
+  private static String getValueAsString(NetworkTableEntry entry) {
+    switch (entry.getType()) {
+      case kDouble:
+        return String.valueOf(entry.getDouble(0));
+      case kString:
+        return entry.getString("");
+      case kBoolean:
+        return String.valueOf(entry.getBoolean(false));
+      case kDoubleArray:
+        return Arrays.stream(entry.getDoubleArray(new Double[]{0.0}))
+            .mapToDouble(Double::doubleValue)
+            .mapToObj(String::valueOf)
+            .collect(Collectors.joining(","));
+      case kStringArray: {
+        String data[] = entry.getStringArray(new String[]{""});
+        StringJoiner joiner = new StringJoiner(",");
+        for (String datum : data) {
+          joiner.add(datum);
+        }
+        return joiner.toString();
+      }
+      case kBooleanArray:
+        return Arrays.stream(entry.getBooleanArray(new Boolean[]{false}))
+            .mapToInt(val -> !val ? 0 : 1)
+            .mapToObj(String::valueOf)
+            .collect(Collectors.joining(","));
+      case kRaw: {
+        byte data[] = entry.getRaw(new byte[]{0});
+        StringJoiner joiner = new StringJoiner(",");
+        for (byte datum : data) {
+          joiner.add(String.valueOf(datum));
+        }
+        return joiner.toString();
+      }
+      default:
+        return "";
+    }
+  }
+
   @Override
   @SuppressWarnings("PMD")
   public void run() {
     NetworkTableUtilities.getNetworkTableInstance().addEntryListener("", notification -> {
-      System.out.println("New Entry");
-      String entry = notification.getEntry().getString("");
+      String entry = getValueAsString(notification.getEntry());
       if (!entry.equals("")) {
         values.put(notification.getEntry().getName(), entry);
       }
 
       notification.getEntry().addListener(entryNotification -> {
         if ((entryNotification.flags & kNew) != 0 || (entryNotification.flags & kUpdate) != 0) {
-          String val = entryNotification.getEntry().getString("");
+          String val = getValueAsString(entryNotification.getEntry());
           if (!val.equals("")) {
             values.put(entryNotification.getEntry().getName(), val);
           }
@@ -61,6 +104,7 @@ public class NetworkTableRecorder extends Thread {
       }, kUpdate | kDelete);
     }, kNew);
 
+    //Even though this loop doesn't do much, we need it to stop us from freezing
     while (keepRunning) {
       //Paused means stop recording and wait
       if (isPaused) {
@@ -71,7 +115,6 @@ public class NetworkTableRecorder extends Thread {
 
       //Else we aren't paused so keep recording
       state.set(State.RUNNABLE);
-      //values.add("Hello, World!");
       waitTimestep();
     }
 
