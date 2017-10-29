@@ -42,52 +42,6 @@ public class NetworkTableRecorder extends Thread {
     values = new NTRecord();
   }
 
-  private static String getValueAsString(NetworkTableEntry entry) {
-    switch (entry.getType()) {
-      case kDouble:
-        return String.valueOf(entry.getDouble(0));
-
-      case kString:
-        return entry.getString("");
-      case kBoolean:
-
-        return String.valueOf(entry.getBoolean(false));
-
-      case kDoubleArray:
-        return Arrays.stream(entry.getDoubleArray(new Double[]{0.0}))
-            .mapToDouble(Double::doubleValue)
-            .mapToObj(String::valueOf)
-            .collect(Collectors.joining(","));
-
-      case kStringArray: {
-        String[] data = entry.getStringArray(new String[]{""});
-        StringJoiner joiner = new StringJoiner(",");
-        for (String datum : data) {
-          joiner.add(datum);
-        }
-        return joiner.toString();
-      }
-
-      case kBooleanArray:
-        return Arrays.stream(entry.getBooleanArray(new Boolean[]{false}))
-            .mapToInt(val -> val ? 1 : 0)
-            .mapToObj(String::valueOf)
-            .collect(Collectors.joining(","));
-
-      case kRaw: {
-        byte[] data = entry.getRaw(new byte[]{0});
-        StringJoiner joiner = new StringJoiner(",");
-        for (byte datum : data) {
-          joiner.add(String.valueOf(datum));
-        }
-        return joiner.toString();
-      }
-
-      default:
-        return "";
-    }
-  }
-
   @Override
   @SuppressWarnings("PMD")
   public void run() {
@@ -240,4 +194,56 @@ public class NetworkTableRecorder extends Thread {
       e.printStackTrace();
     }
   }
+
+  /**
+   * Returns a NetworkTableEntry's value as a string.
+   * @param entry Entry to string-ify
+   * @return String representation of the entry's value
+   */
+  private static String getValueAsString(NetworkTableEntry entry) {
+    switch (entry.getType()) {
+      case kDouble:
+        return String.valueOf(entry.getDouble(0));
+
+      case kString:
+        return entry.getString("");
+      case kBoolean:
+
+        return String.valueOf(entry.getBoolean(false));
+
+      case kDoubleArray:
+        return Arrays.stream(entry.getDoubleArray(new Double[]{0.0}))
+            .mapToDouble(Double::doubleValue)
+            .mapToObj(String::valueOf)
+            .collect(Collectors.joining(","));
+
+      case kStringArray: {
+        String[] data = entry.getStringArray(new String[]{""});
+        StringJoiner joiner = new StringJoiner(",");
+        for (String datum : data) {
+          joiner.add(datum);
+        }
+        return joiner.toString();
+      }
+
+      case kBooleanArray:
+        return Arrays.stream(entry.getBooleanArray(new Boolean[]{false}))
+            .mapToInt(val -> val ? 1 : 0)
+            .mapToObj(String::valueOf)
+            .collect(Collectors.joining(","));
+
+      case kRaw: {
+        byte[] data = entry.getRaw(new byte[]{0});
+        StringJoiner joiner = new StringJoiner(",");
+        for (byte datum : data) {
+          joiner.add(String.valueOf(datum));
+        }
+        return joiner.toString();
+      }
+
+      default:
+        return "";
+    }
+  }
+
 }
