@@ -23,6 +23,7 @@ import javafx.stage.FileChooser;
 import javafx.stage.Window;
 
 public class NetworkTableRecorder extends Thread {
+
   private static final String NTR_EXTENSION = ".ntr";
 
   //Keep running the thread, false means kill and exit
@@ -31,11 +32,12 @@ public class NetworkTableRecorder extends Thread {
   private boolean isPaused;
   //State of the overall recorder (only written to in this class, not read from)
   private final SimpleObjectProperty<Thread.State> state;
+
   private final NTRecord values;
 
   public NetworkTableRecorder() {
     super();
-    setDaemon(true);
+    setDaemon(true); //So we don't stop the application from closing
     keepRunning = true;
     isPaused = false;
     state = new SimpleObjectProperty<>(State.NEW);
@@ -46,19 +48,14 @@ public class NetworkTableRecorder extends Thread {
   @SuppressWarnings("PMD")
   public void run() {
     NetworkTableUtilities.getNetworkTableInstance().addEntryListener("", notification -> {
-      String entry = getValueAsString(notification.getEntry());
-      if (!entry.equals("")) {
-        values.put(notification.getEntry().getName(), entry);
-      }
+      saveEntry(notification.getEntry().getName(), getValueAsString(notification.getEntry()));
 
       notification.getEntry().addListener(entryNotification -> {
         if ((entryNotification.flags & kNew) != 0 || (entryNotification.flags & kUpdate) != 0) {
-          String val = getValueAsString(entryNotification.getEntry());
-          if (!val.equals("")) {
-            values.put(entryNotification.getEntry().getName(), val);
-          }
+          saveEntry(entryNotification.getEntry().getName(),
+              getValueAsString(entryNotification.getEntry()));
         } else if ((entryNotification.flags & kDelete) != 0) {
-          values.put(entryNotification.getEntry().getName(), "[[DELETED]]");
+          saveEntry(entryNotification.getEntry().getName(), "[[DELETED]]");
         }
       }, kUpdate | kDelete);
     }, kNew);
@@ -79,6 +76,12 @@ public class NetworkTableRecorder extends Thread {
 
     System.out.println("Terminated!");
     state.set(State.TERMINATED);
+  }
+
+  private void saveEntry(String key, String val) {
+    if (!val.equals("")) {
+      values.put(key, val);
+    }
   }
 
   /**
@@ -197,6 +200,7 @@ public class NetworkTableRecorder extends Thread {
 
   /**
    * Returns a NetworkTableEntry's value as a string.
+   *
    * @param entry Entry to string-ify
    * @return String representation of the entry's value
    */
