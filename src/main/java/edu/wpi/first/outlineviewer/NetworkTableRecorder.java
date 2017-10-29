@@ -57,7 +57,9 @@ public class NetworkTableRecorder extends Thread {
   private final SimpleObjectProperty<Thread.State> state;
 
   private final ConcurrentHashMap<LocalDateTime, EntryChange> values;
+
   private final ConcurrentHashMap<LocalDateTime, EntryChange> playback;
+  private Thread playbackThread = null;
 
   public NetworkTableRecorder() {
     super();
@@ -107,6 +109,9 @@ public class NetworkTableRecorder extends Thread {
     while (keepRunning) {
       //Paused means stop recording and wait
       if (isPaused) {
+        if (playbackThread != null && playbackThread.getState().equals(State.TERMINATED)) {
+          unpause(); //Playback is done so go back to recording
+        }
         state.set(State.WAITING);
         waitTimestep();
         continue;
@@ -283,47 +288,82 @@ public class NetworkTableRecorder extends Thread {
   }
 
   private void startPlayback() {
-    playback.keySet()
-        .parallelStream()
-        .sorted()
-        .forEachOrdered(time -> {
-          EntryChange change = playback.get(time);
-          NetworkTableEntry entry = NetworkTableUtilities.getNetworkTableInstance()
-              .getEntry(change.getName());
+    playbackThread = new Thread(() ->
+        playback.keySet()
+            .stream()
+            .sorted()
+            .forEachOrdered(time -> {
+              EntryChange change = playback.get(time);
+              NetworkTableEntry entry = NetworkTableUtilities.getNetworkTableInstance()
+                  .getEntry(change.getName());
 
-          switch (change.getType()) {
-            case kDouble:
-              entry.setDouble(Double.parseDouble(change.getNewValue()));
-              break;
+              switch (change.getType()) {
+                case kDouble:
+                  if (change.getNewValue().equals("[[DELETED]]")) {
+                    entry.delete();
+                  } else {
+                    entry.setDouble(Double.parseDouble(change.getNewValue()));
+                  }
+                  break;
 
-            case kString:
-              entry.setString(change.getNewValue());
-              break;
+                case kString:
+                  if (change.getNewValue().equals("[[DELETED]]")) {
+                    entry.delete();
+                  } else {
+                    entry.setString(change.getNewValue());
+                  }
+                  break;
 
-            case kBoolean:
-              entry.setBoolean(Boolean.parseBoolean(change.getNewValue()));
-              break;
+                case kBoolean:
+                  if (change.getNewValue().equals("[[DELETED]]")) {
+                    entry.delete();
+                  } else {
+                    entry.setBoolean(Boolean.parseBoolean(change.getNewValue()));
+                  }
+                  break;
 
-            case kDoubleArray:
-              entry.setDoubleArray(parseDoubleArray(change.getNewValue()));
-              break;
+                case kDoubleArray:
+                  if (change.getNewValue().equals("[[DELETED]]")) {
+                    entry.delete();
+                  } else {
+                    entry.setDoubleArray(parseDoubleArray(change.getNewValue()));
+                  }
+                  break;
 
-            case kStringArray:
-              entry.setStringArray(parseStringArray(change.getNewValue()));
-              break;
+                case kStringArray:
+                  if (change.getNewValue().equals("[[DELETED]]")) {
+                    entry.delete();
+                  } else {
+                    entry.setStringArray(parseStringArray(change.getNewValue()));
+                  }
+                  break;
 
-            case kBooleanArray:
-              entry.setBooleanArray(parseBooleanArray(change.getNewValue()));
-              break;
+                case kBooleanArray:
+                  if (change.getNewValue().equals("[[DELETED]]")) {
+                    entry.delete();
+                  } else {
+                    entry.setBooleanArray(parseBooleanArray(change.getNewValue()));
+                  }
+                  break;
 
-            case kRaw:
-              entry.setRaw(parseByteArray(change.getNewValue()));
-              break;
+                case kRaw:
+                  if (change.getNewValue().equals("[[DELETED]]")) {
+                    entry.delete();
+                  } else {
+                    entry.setRaw(parseByteArray(change.getNewValue()));
+                  }
+                  break;
 
-            default:
-              break;
-          }
-        });
+                case kUnassigned:
+                  if (change.getNewValue().equals("[[DELETED]]")) {
+                    entry.delete();
+                  }
+
+                default:
+                  break;
+              }
+            }));
+    playbackThread.start();
   }
 
   /**
@@ -335,7 +375,7 @@ public class NetworkTableRecorder extends Thread {
   private double[] parseDoubleArray(String source) {
     List<Double> doubles = new ArrayList<>();
 
-    for (int i = 0; i < source.length();) {
+    for (int i = 0; i < source.length(); ) {
       String sub = findSubstring(source, i, ',', false);
       if (!sub.equals("")) {
         doubles.add(Double.parseDouble(sub));
@@ -357,7 +397,7 @@ public class NetworkTableRecorder extends Thread {
   private String[] parseStringArray(String source) {
     List<String> strings = new ArrayList<>();
 
-    for (int i = 0; i < source.length();) {
+    for (int i = 0; i < source.length(); ) {
       String sub = findSubstring(source, i, ',', false);
       if (!sub.equals("")) {
         strings.add(sub);
@@ -379,7 +419,7 @@ public class NetworkTableRecorder extends Thread {
   private boolean[] parseBooleanArray(String source) {
     List<Boolean> booleans = new ArrayList<>();
 
-    for (int i = 0; i < source.length();) {
+    for (int i = 0; i < source.length(); ) {
       String sub = findSubstring(source, i, ',', false);
       String val = sub;
 
@@ -410,7 +450,7 @@ public class NetworkTableRecorder extends Thread {
   private byte[] parseByteArray(String source) {
     List<Byte> bytes = new ArrayList<>();
 
-    for (int i = 0; i < source.length();) {
+    for (int i = 0; i < source.length(); ) {
       String sub = findSubstring(source, i, ',', false);
       if (!sub.equals("")) {
         bytes.add(Byte.parseByte(sub));
@@ -460,6 +500,7 @@ public class NetworkTableRecorder extends Thread {
    */
   public void pause() {
     isPaused = true;
+    state.set(State.WAITING);
   }
 
   /**
@@ -467,6 +508,7 @@ public class NetworkTableRecorder extends Thread {
    */
   public void unpause() {
     isPaused = false;
+    state.set(State.RUNNABLE);
   }
 
   @Override
