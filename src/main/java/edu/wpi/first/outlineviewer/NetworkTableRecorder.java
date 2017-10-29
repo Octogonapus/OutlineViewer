@@ -1,16 +1,20 @@
 package edu.wpi.first.outlineviewer;
 
+import static edu.wpi.first.networktables.EntryListenerFlags.kDelete;
+import static edu.wpi.first.networktables.EntryListenerFlags.kNew;
+import static edu.wpi.first.networktables.EntryListenerFlags.kUpdate;
+
 import com.google.common.base.Charsets;
 import com.google.common.io.CharSink;
 import com.google.common.io.FileWriteMode;
 import com.google.common.io.Files;
-import edu.wpi.first.networktables.NetworkTableValue;
+import edu.wpi.first.outlineviewer.model.NTRecord;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.List;
+import java.time.LocalDateTime;
+import java.util.logging.Logger;
 import javafx.beans.property.SimpleObjectProperty;
 import javafx.stage.FileChooser;
 import javafx.stage.Window;
@@ -24,20 +28,39 @@ public class NetworkTableRecorder extends Thread {
   private boolean isPaused;
   //State of the overall recorder (only written to in this class, not read from)
   private final SimpleObjectProperty<Thread.State> state;
-  private final List<NetworkTableValue> values;
+  private final NTRecord values;
 
   public NetworkTableRecorder() {
     super();
+    setDaemon(true);
     keepRunning = true;
     isPaused = false;
     state = new SimpleObjectProperty<>(State.NEW);
-    values = new ArrayList<>();
+    values = new NTRecord();
   }
 
   @Override
   @SuppressWarnings("PMD")
   public void run() {
-    //    System.out.println("RUN!");
+    NetworkTableUtilities.getNetworkTableInstance().addEntryListener("", notification -> {
+      System.out.println("New Entry");
+      String entry = notification.getEntry().getString("");
+      if (!entry.equals("")) {
+        values.put(notification.getEntry().getName(), entry);
+      }
+
+      notification.getEntry().addListener(entryNotification -> {
+        if ((entryNotification.flags & kNew) != 0 || (entryNotification.flags & kUpdate) != 0) {
+          String val = entryNotification.getEntry().getString("");
+          if (!val.equals("")) {
+            values.put(entryNotification.getEntry().getName(), val);
+          }
+        } else if ((entryNotification.flags & kDelete) != 0) {
+          values.put(entryNotification.getEntry().getName(), "[[DELETED]]");
+        }
+      }, kUpdate | kDelete);
+    }, kNew);
+
     while (keepRunning) {
       //Paused means stop recording and wait
       if (isPaused) {
@@ -48,7 +71,7 @@ public class NetworkTableRecorder extends Thread {
 
       //Else we aren't paused so keep recording
       state.set(State.RUNNABLE);
-      values.add(NetworkTableValue.makeString("Hello, World!"));
+      //values.add("Hello, World!");
       waitTimestep();
     }
 
@@ -121,13 +144,19 @@ public class NetworkTableRecorder extends Thread {
     //Write to file
     try {
       CharSink sink = Files.asCharSink(file, Charsets.UTF_8, FileWriteMode.APPEND);
-      values.forEach(val -> {
+
+      //Header
+      sink.write("[[NETWORKTABLES RECORDING]]\n");
+      sink.write("[[DATE: " + LocalDateTime.now() + "]]\n");
+
+      //Data
+      values.forEach((key, valList) -> valList.forEach(elem -> {
         try {
-          sink.write(val.getString() + "\n");
+          sink.write(key + " : " + elem + "\n");
         } catch (IOException e) {
           e.printStackTrace();
         }
-      });
+      }));
     } finally {
       join();
     }

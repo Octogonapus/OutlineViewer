@@ -321,12 +321,19 @@ public class MainWindowController {
   }
 
   @FXML
+  private void startNTRecord() {
+    try {
+      ntRecorder.start();
+    } catch (IllegalThreadStateException e) {
+      System.out.println("Cannot start a thread that is already started!");
+    }
+  }
+
+  @FXML
   private void saveNTRecord() {
     try {
       ntRecorder.saveAndJoin(root.getScene().getWindow());
-    } catch (IOException e) {
-      e.printStackTrace();
-    } catch (InterruptedException e) {
+    } catch (IOException | InterruptedException e) {
       e.printStackTrace();
     }
   }
