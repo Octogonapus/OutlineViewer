@@ -47,6 +47,7 @@ public class NetworkTableRecorder extends Thread {
   private final SimpleObjectProperty<Thread.State> state;
 
   private final ConcurrentHashMap<Long, EntryChange> values;
+  private long startTime;
 
   private final ConcurrentHashMap<Long, EntryChange> playback;
   private Thread playbackThread = null;
@@ -73,6 +74,7 @@ public class NetworkTableRecorder extends Thread {
   @SuppressWarnings("PMD")
   public void run() {
     System.out.println("Started!");
+    startTime = System.nanoTime();
 
     NetworkTableEntry[] entries = NetworkTableUtilities.getNetworkTableInstance()
         .getEntries("", 0xFF);
@@ -125,9 +127,11 @@ public class NetworkTableRecorder extends Thread {
 
   private void saveEntry(String key, NetworkTableType type, String newValue, boolean wasDeleted) {
     if (wasDeleted) {
-      values.put(System.nanoTime(), new EntryChange(key, type, "[[DELETED]]"));
+      values.put(System.nanoTime() - startTime,
+          new EntryChange(key, type, "[[DELETED]]"));
     } else {
-      values.put(System.nanoTime(), new EntryChange(key, type, newValue));
+      values.put(System.nanoTime() - startTime,
+          new EntryChange(key, type, newValue));
     }
   }
 
@@ -301,10 +305,21 @@ public class NetworkTableRecorder extends Thread {
 
   private void startPlayback() {
     playbackThread = new Thread(() -> {
+      final long startTime = System.nanoTime();
+
       playback.keySet()
           .stream()
           .sorted()
           .forEachOrdered(time -> {
+            long diff = System.nanoTime() - startTime;
+            if (diff < time) {
+              try {
+                Thread.sleep(Math.round((time - diff) / 1000000.0));
+              } catch (InterruptedException e) {
+                e.printStackTrace();
+              }
+            }
+
             EntryChange change = playback.get(time);
             NetworkTableEntry entry = NetworkTableUtilities.getNetworkTableInstance()
                 .getEntry(change.getName());
