@@ -23,6 +23,8 @@ import java.util.StringJoiner;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 import javafx.application.Platform;
+import javafx.beans.property.DoubleProperty;
+import javafx.beans.property.SimpleDoubleProperty;
 import javafx.beans.property.SimpleObjectProperty;
 import javafx.geometry.Pos;
 import javafx.scene.control.ButtonType;
@@ -51,6 +53,7 @@ public class NetworkTableRecorder extends Thread {
 
   private final ConcurrentHashMap<Long, EntryChange> playback;
   private Thread playbackThread = null;
+  private DoubleProperty playbackPercentage;
 
   public NetworkTableRecorder() {
     super();
@@ -60,6 +63,7 @@ public class NetworkTableRecorder extends Thread {
     state = new SimpleObjectProperty<>(State.NEW);
     values = new ConcurrentHashMap<>();
     playback = new ConcurrentHashMap<>();
+    playbackPercentage = new SimpleDoubleProperty(0);
   }
 
   @Override
@@ -73,7 +77,6 @@ public class NetworkTableRecorder extends Thread {
   @Override
   @SuppressWarnings("PMD")
   public void run() {
-    System.out.println("Started!");
     startTime = System.nanoTime();
 
     NetworkTableEntry[] entries = NetworkTableUtilities.getNetworkTableInstance()
@@ -117,7 +120,6 @@ public class NetworkTableRecorder extends Thread {
       waitTimestep();
     }
 
-    System.out.println("Terminated!");
     state.set(State.TERMINATED);
   }
 
@@ -306,6 +308,8 @@ public class NetworkTableRecorder extends Thread {
   private void startPlayback() {
     playbackThread = new Thread(() -> {
       final long startTime = System.nanoTime();
+      final int max = playback.size();
+      final int[] completed = new int[]{0};
 
       playback.keySet()
           .stream()
@@ -389,9 +393,11 @@ public class NetworkTableRecorder extends Thread {
               default:
                 break;
             }
+
+            playbackPercentage.set(completed[0]++ / (float)max);
           });
-      System.out.println("Done!");
     });
+    playbackThread.setDaemon(true);
     playbackThread.start();
   }
 
@@ -547,6 +553,14 @@ public class NetworkTableRecorder extends Thread {
 
   public SimpleObjectProperty<State> stateProperty() {
     return state;
+  }
+
+  public double getPlaybackPercentage() {
+    return playbackPercentage.get();
+  }
+
+  public DoubleProperty playbackPercentageProperty() {
+    return playbackPercentage;
   }
 
   private void waitTimestep() {

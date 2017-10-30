@@ -32,6 +32,7 @@ import javafx.scene.control.ContextMenu;
 import javafx.scene.control.MenuItem;
 import javafx.scene.control.SelectionMode;
 import javafx.scene.control.SeparatorMenuItem;
+import javafx.scene.control.Slider;
 import javafx.scene.control.TreeItem;
 import javafx.scene.control.TreeTableColumn;
 import javafx.scene.control.TreeTableRow;
@@ -64,6 +65,8 @@ public class MainWindowController {
   @FXML
   private TreeTableColumn<TreeRow, String> typeColumn;
 
+  @FXML
+  private Slider replaySlider;
   private NetworkTableRecorder ntRecorder;
 
   @FXML
@@ -197,6 +200,9 @@ public class MainWindowController {
     });
 
     ntRecorder = new NetworkTableRecorder();
+    replaySlider.setMin(0);
+    replaySlider.setMax(1);
+    replaySlider.valueProperty().bind(ntRecorder.playbackPercentageProperty());
   }
 
   /**

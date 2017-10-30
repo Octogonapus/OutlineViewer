@@ -1,49 +1,54 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
 <?import edu.wpi.first.outlineviewer.view.NetworkTableTree?>
+<?import java.net.URL?>
+<?import javafx.geometry.Insets?>
 <?import javafx.scene.control.Menu?>
 <?import javafx.scene.control.MenuBar?>
 <?import javafx.scene.control.MenuItem?>
+<?import javafx.scene.control.SeparatorMenuItem?>
+<?import javafx.scene.control.Slider?>
 <?import javafx.scene.control.TreeItem?>
 <?import javafx.scene.control.TreeTableColumn?>
 <?import javafx.scene.layout.BorderPane?>
-<?import java.net.URL?>
-<?import javafx.scene.control.SeparatorMenuItem?>
-<BorderPane maxHeight="16000" maxWidth="16000"
-            minHeight="400" minWidth="600"
-            prefHeight="400.0" prefWidth="600.0"
-            fx:id="root"
-            id="root"
-            xmlns="http://javafx.com/javafx/8.0.112" xmlns:fx="http://javafx.com/fxml/1"
-            fx:controller="edu.wpi.first.outlineviewer.controller.MainWindowController">
+<?import javafx.scene.layout.VBox?>
+
+<BorderPane id="root" fx:id="root" maxHeight="16000" maxWidth="16000" minHeight="400" minWidth="600" prefHeight="400.0" prefWidth="600.0" xmlns="http://javafx.com/javafx/8.0.121" xmlns:fx="http://javafx.com/fxml/1" fx:controller="edu.wpi.first.outlineviewer.controller.MainWindowController">
     <top>
         <MenuBar BorderPane.alignment="CENTER">
-            <Menu mnemonicParsing="false" text="File" id="fileMenu">
-                <MenuItem onAction="#loadState" text="Load state" id="loadStateButton" accelerator="SHORTCUT+O"/>
-                <MenuItem onAction="#saveState" text="Save state" id="saveStateButton" accelerator="SHORTCUT+S"/>
-                <MenuItem onAction="#startNTRecord" text="Start Recording" id="startNTRecordButton" accelerator="SHORTCUT+E" />
-                <MenuItem onAction="#saveNTRecord" text="Save Recording" id="saveNTRecordButton" accelerator="SHORTCUT+R" />
-                <MenuItem onAction="#loadNTRecord" text="Load Recording" id="loadNTRecordButton" accelerator="SHORTCUT+F"/>
+            <Menu id="fileMenu" mnemonicParsing="false" text="File">
+                <MenuItem id="loadStateButton" accelerator="SHORTCUT+O" onAction="#loadState" text="Load state" />
+                <MenuItem id="saveStateButton" accelerator="SHORTCUT+S" onAction="#saveState" text="Save state" />
+                <MenuItem id="startNTRecordButton" accelerator="SHORTCUT+E" onAction="#startNTRecord" text="Start Recording" />
+                <MenuItem id="saveNTRecordButton" accelerator="SHORTCUT+R" onAction="#saveNTRecord" text="Save Recording" />
+                <MenuItem id="loadNTRecordButton" accelerator="SHORTCUT+F" onAction="#loadNTRecord" text="Load Recording" />
                 <SeparatorMenuItem />
-                <MenuItem onAction="#showPreferences" text="Preferences" id="preferencesMenuButton" accelerator="SHORTCUT+,"/>
-                <MenuItem onAction="#exitProgram" text="Exit" id="exitMenuButton" accelerator="SHORTCUT+q"/>
+                <MenuItem id="preferencesMenuButton" accelerator="SHORTCUT+," onAction="#showPreferences" text="Preferences" />
+                <MenuItem id="exitMenuButton" accelerator="SHORTCUT+q" onAction="#exitProgram" text="Exit" />
             </Menu>
         </MenuBar>
     </top>
     <center>
-        <NetworkTableTree fx:id="tableView" editable="true" BorderPane.alignment="CENTER" id="tableView">
-            <TreeItem fx:id="ntRoot" expanded="true"/>
+        <NetworkTableTree id="tableView" fx:id="tableView" editable="true" BorderPane.alignment="CENTER">
+            <TreeItem fx:id="ntRoot" expanded="true" />
             <columns>
-                <TreeTableColumn fx:id="keyColumn" minWidth="200" prefWidth="200" sortable="false" text="Key" id="keyColumn"/>
-                <TreeTableColumn fx:id="valueColumn" minWidth="200" prefWidth="200" sortable="false" text="Value" id="valueColumn"/>
-                <TreeTableColumn fx:id="typeColumn" editable="false" prefWidth="100" minWidth="100" sortable="false" text="Type" id="typeColumn"/>
+                <TreeTableColumn id="keyColumn" fx:id="keyColumn" minWidth="200" prefWidth="200" sortable="false" text="Key" />
+                <TreeTableColumn id="valueColumn" fx:id="valueColumn" minWidth="200" prefWidth="200" sortable="false" text="Value" />
+                <TreeTableColumn id="typeColumn" fx:id="typeColumn" editable="false" minWidth="100" prefWidth="100" sortable="false" text="Type" />
             </columns>
         </NetworkTableTree>
     </center>
     <bottom>
-        <fx:include source="ConnectionIndicator.fxml" id="connectionIndicator"/>
+        <VBox spacing="5">
+            <fx:include id="connectionIndicator" source="ConnectionIndicator.fxml" />
+            <Slider id="replaySlider" fx:id="replaySlider">
+            <padding>
+               <Insets bottom="5.0" left="5.0" right="5.0" />
+            </padding></Slider>
+        </VBox>
+
     </bottom>
     <stylesheets>
-        <URL value="@styles.css"/>
+        <URL value="@styles.css" />
     </stylesheets>
 </BorderPane>
