@@ -5,19 +5,14 @@ import static edu.wpi.first.networktables.EntryListenerFlags.kNew;
 import static edu.wpi.first.networktables.EntryListenerFlags.kUpdate;
 
 import com.google.common.base.Charsets;
-import com.google.common.escape.ArrayBasedUnicodeEscaper;
-import com.google.common.escape.Escaper;
-import com.google.common.escape.UnicodeEscaper;
 import com.google.common.io.CharSink;
 import com.google.common.io.FileWriteMode;
 import com.google.common.io.Files;
-import com.google.common.net.PercentEscaper;
 import edu.wpi.first.networktables.NetworkTableEntry;
 import edu.wpi.first.networktables.NetworkTableType;
 import edu.wpi.first.outlineviewer.model.EntryChange;
 import java.io.BufferedReader;
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
 import java.nio.file.Path;
@@ -25,10 +20,7 @@ import java.nio.file.Paths;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.StringJoiner;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
@@ -37,13 +29,6 @@ import javafx.stage.FileChooser;
 import javafx.stage.Window;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.text.StringEscapeUtils;
-import org.apache.commons.text.translate.AggregateTranslator;
-import org.apache.commons.text.translate.CharSequenceTranslator;
-import org.apache.commons.text.translate.EntityArrays;
-import org.apache.commons.text.translate.JavaUnicodeEscaper;
-import org.apache.commons.text.translate.LookupTranslator;
-import org.apache.commons.text.translate.OctalUnescaper;
-import org.apache.commons.text.translate.UnicodeUnescaper;
 
 public class NetworkTableRecorder extends Thread {
 
@@ -56,9 +41,9 @@ public class NetworkTableRecorder extends Thread {
   //State of the overall recorder (only written to in this class, not read from)
   private final SimpleObjectProperty<Thread.State> state;
 
-  private final ConcurrentHashMap<LocalDateTime, EntryChange> values;
+  private final ConcurrentHashMap<Long, EntryChange> values;
 
-  private final ConcurrentHashMap<LocalDateTime, EntryChange> playback;
+  private final ConcurrentHashMap<Long, EntryChange> playback;
   private Thread playbackThread = null;
 
   public NetworkTableRecorder() {
@@ -82,28 +67,28 @@ public class NetworkTableRecorder extends Thread {
   @Override
   @SuppressWarnings("PMD")
   public void run() {
+    NetworkTableEntry[] entries = NetworkTableUtilities.getNetworkTableInstance()
+        .getEntries("", 0xFF);
+    for (NetworkTableEntry entry : entries) {
+      saveEntry(entry.getName(),
+          entry.getType(),
+          getValueAsString(entry));
+    }
+
     NetworkTableUtilities.getNetworkTableInstance().addEntryListener("", notification -> {
       if (state.get().equals(State.RUNNABLE)) {
-        saveEntry(notification.getEntry().getName(),
-            notification.getEntry().getType(),
-            getValueAsString(notification.getEntry()));
-
-        notification.getEntry().addListener(entryNotification -> {
-          if (state.get().equals(State.RUNNABLE)) {
-            if ((entryNotification.flags & kNew) != 0 || (entryNotification.flags & kUpdate) != 0) {
-              saveEntry(entryNotification.getEntry().getName(),
-                  entryNotification.getEntry().getType(),
-                  getValueAsString(entryNotification.getEntry()));
-            } else if ((entryNotification.flags & kDelete) != 0) {
-              saveEntry(entryNotification.getEntry().getName(),
-                  entryNotification.getEntry().getType(),
-                  "",
-                  true);
-            }
-          }
-        }, kUpdate | kDelete);
+        if ((notification.flags & kNew) != 0 || (notification.flags & kUpdate) != 0) {
+          saveEntry(notification.getEntry().getName(),
+              notification.getEntry().getType(),
+              getValueAsString(notification.getEntry()));
+        } else if ((notification.flags & kDelete) != 0) {
+          saveEntry(notification.getEntry().getName(),
+              notification.getEntry().getType(),
+              "",
+              true);
+        }
       }
-    }, kNew);
+    },  kNew | kUpdate | kDelete);
 
     //Even though this loop doesn't do much, we need it to stop us from freezing
     while (keepRunning) {
@@ -119,6 +104,7 @@ public class NetworkTableRecorder extends Thread {
 
       //Else we aren't paused so keep recording
       state.set(State.RUNNABLE);
+
       waitTimestep();
     }
 
@@ -132,9 +118,9 @@ public class NetworkTableRecorder extends Thread {
 
   private void saveEntry(String key, NetworkTableType type, String newValue, boolean wasDeleted) {
     if (wasDeleted) {
-      values.put(LocalDateTime.now(), new EntryChange(key, type, "[[DELETED]]"));
+      values.put(System.nanoTime(), new EntryChange(key, type, "[[DELETED]]"));
     } else {
-      values.put(LocalDateTime.now(), new EntryChange(key, type, newValue));
+      values.put(System.nanoTime(), new EntryChange(key, type, newValue));
     }
   }
 
@@ -276,7 +262,7 @@ public class NetworkTableRecorder extends Thread {
         type = StringEscapeUtils.unescapeXSI(type);
         value = StringEscapeUtils.unescapeXSI(value);
 
-        playback.put(LocalDateTime.parse(time),
+        playback.put(Long.parseLong(time),
             new EntryChange(key,
                 NetworkTableType.getFromInt(Integer.parseInt(type)),
                 value));
