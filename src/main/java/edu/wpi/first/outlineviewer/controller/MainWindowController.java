@@ -348,7 +348,7 @@ public class MainWindowController {
     File selected = fileChooser.showOpenDialog(root.getScene().getWindow());
     if (selected != null) {
       try {
-        ntRecorder.load(selected);
+        ntRecorder.load(selected, root.getScene().getWindow());
       } catch (IOException ignored) {
       }
     }

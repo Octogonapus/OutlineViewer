@@ -21,6 +21,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.StringJoiner;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CountDownLatch;
 import java.util.stream.Collectors;
 import javafx.application.Platform;
 import javafx.beans.property.DoubleProperty;
@@ -255,50 +256,79 @@ public class NetworkTableRecorder extends Thread {
    * @param file Recording file
    * @throws IOException Loading the file could produce an IOException
    */
-  public void load(File file) throws IOException {
-    try (BufferedReader br = new BufferedReader(new FileReader(file))) {
-      String line;
-      int lineCount = 0;
-      while ((line = br.readLine()) != null) {
-        if (lineCount++ <= 1) {
-          continue;
+  public void load(File file, Window window) throws IOException {
+    ProgressIndicator progressIndicator = new ProgressIndicator();
+    Dialog<String> dialog = new Dialog<>();
+    StackPane pane = new StackPane(progressIndicator);
+    pane.setPrefSize(200, 100);
+    pane.setAlignment(Pos.CENTER);
+    dialog.getDialogPane().setContent(pane);
+    dialog.setTitle("Loading NetworkTables Recording...");
+    dialog.initOwner(window);
+    dialog.initModality(Modality.WINDOW_MODAL);
+    dialog.show();
+
+    CountDownLatch latch = new CountDownLatch(1);
+
+    new Thread(() -> {
+      try (BufferedReader br = new BufferedReader(new FileReader(file))) {
+        String line;
+        int lineCount = 0;
+        while ((line = br.readLine()) != null) {
+          if (lineCount++ <= 1) {
+            continue;
+          }
+
+          String time;
+          String key;
+          String type;
+          String value;
+
+          time = findSubstring(line,
+              0,
+              ';',
+              true);
+
+          key = findSubstring(line,
+              time.length() + 1,
+              ';',
+              true);
+
+          type = findSubstring(line,
+              time.length() + key.length() + 2,
+              ';',
+              true);
+
+          value = findSubstring(line,
+              time.length() + key.length() + type.length() + 3,
+              ';',
+              true);
+
+          time = StringEscapeUtils.unescapeXSI(time);
+          key = StringEscapeUtils.unescapeXSI(key);
+          type = StringEscapeUtils.unescapeXSI(type);
+          value = StringEscapeUtils.unescapeXSI(value);
+
+          playback.put(Long.parseLong(time),
+              new EntryChange(key,
+                  NetworkTableType.getFromInt(Integer.parseInt(type)),
+                  value));
         }
-
-        String time;
-        String key;
-        String type;
-        String value;
-
-        time = findSubstring(line,
-            0,
-            ';',
-            true);
-
-        key = findSubstring(line,
-            time.length() + 1,
-            ';',
-            true);
-
-        type = findSubstring(line,
-            time.length() + key.length() + 2,
-            ';',
-            true);
-
-        value = findSubstring(line,
-            time.length() + key.length() + type.length() + 3,
-            ';',
-            true);
-
-        time = StringEscapeUtils.unescapeXSI(time);
-        key = StringEscapeUtils.unescapeXSI(key);
-        type = StringEscapeUtils.unescapeXSI(type);
-        value = StringEscapeUtils.unescapeXSI(value);
-
-        playback.put(Long.parseLong(time),
-            new EntryChange(key,
-                NetworkTableType.getFromInt(Integer.parseInt(type)),
-                value));
+      } catch (IOException e) {
+        e.printStackTrace();
+      } finally {
+        Platform.runLater(() -> {
+          dialog.getDialogPane().getButtonTypes().add(ButtonType.CANCEL);
+          dialog.close();
+        });
+        latch.countDown();
       }
+    }).start();
+
+    try {
+      latch.await();
+    } catch (InterruptedException e) {
+      e.printStackTrace();
     }
 
     pause();
@@ -394,7 +424,7 @@ public class NetworkTableRecorder extends Thread {
                 break;
             }
 
-            playbackPercentage.set(completed[0]++ / (float)max);
+            playbackPercentage.set(completed[0]++ / (float) max);
           });
     });
     playbackThread.setDaemon(true);
