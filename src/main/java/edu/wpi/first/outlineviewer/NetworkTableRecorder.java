@@ -4,9 +4,6 @@ import static edu.wpi.first.networktables.EntryListenerFlags.kDelete;
 import static edu.wpi.first.networktables.EntryListenerFlags.kNew;
 import static edu.wpi.first.networktables.EntryListenerFlags.kUpdate;
 
-import com.google.common.base.Charsets;
-import com.google.common.io.CharSink;
-import com.google.common.io.FileWriteMode;
 import com.google.common.io.Files;
 import edu.wpi.first.networktables.NetworkTableEntry;
 import edu.wpi.first.networktables.NetworkTableType;
@@ -14,6 +11,7 @@ import edu.wpi.first.outlineviewer.model.EntryChange;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -24,8 +22,15 @@ import java.util.List;
 import java.util.StringJoiner;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
+import javafx.application.Platform;
 import javafx.beans.property.SimpleObjectProperty;
+import javafx.geometry.Pos;
+import javafx.scene.control.ButtonType;
+import javafx.scene.control.Dialog;
+import javafx.scene.control.ProgressIndicator;
+import javafx.scene.layout.StackPane;
 import javafx.stage.FileChooser;
+import javafx.stage.Modality;
 import javafx.stage.Window;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.text.StringEscapeUtils;
@@ -67,6 +72,8 @@ public class NetworkTableRecorder extends Thread {
   @Override
   @SuppressWarnings("PMD")
   public void run() {
+    System.out.println("Started!");
+
     NetworkTableEntry[] entries = NetworkTableUtilities.getNetworkTableInstance()
         .getEntries("", 0xFF);
     for (NetworkTableEntry entry : entries) {
@@ -88,7 +95,7 @@ public class NetworkTableRecorder extends Thread {
               true);
         }
       }
-    },  kNew | kUpdate | kDelete);
+    }, kNew | kUpdate | kDelete);
 
     //Even though this loop doesn't do much, we need it to stop us from freezing
     while (keepRunning) {
@@ -141,7 +148,7 @@ public class NetworkTableRecorder extends Thread {
     if (result != null) {
       //Null means the user hit cancel or didn't select a file and therefore doesn't want to save
       //so only save if the file is not null
-      saveAndJoin(result.toPath());
+      saveAndJoin(result.toPath(), window);
     }
   }
 
@@ -152,8 +159,8 @@ public class NetworkTableRecorder extends Thread {
    * @throws IOException Writing to the file could error
    */
   @SuppressWarnings("PMD")
-  public void saveAndJoin(String fileName) throws IOException, InterruptedException {
-    saveAndJoin(Paths.get(fileName));
+  public void saveAndJoin(String fileName, Window window) throws IOException, InterruptedException {
+    saveAndJoin(Paths.get(fileName), window);
   }
 
   /**
@@ -163,7 +170,7 @@ public class NetworkTableRecorder extends Thread {
    * @throws IOException Writing to the file could error
    */
   @SuppressWarnings("PMD")
-  public void saveAndJoin(Path path) throws InterruptedException, IOException {
+  public void saveAndJoin(Path path, Window window) throws InterruptedException, IOException {
     //Add extension if it isn't there
     if (!path.endsWith(NTR_EXTENSION)) {
       path.resolveSibling(path.getFileName() + NTR_EXTENSION);
@@ -186,35 +193,54 @@ public class NetworkTableRecorder extends Thread {
       Files.touch(file);
     }
 
-    //Write to file
-    try {
-      CharSink sink = Files.asCharSink(file, Charsets.UTF_8, FileWriteMode.APPEND);
+    ProgressIndicator progressIndicator = new ProgressIndicator();
+    Dialog<String> dialog = new Dialog<>();
+    StackPane pane = new StackPane(progressIndicator);
+    pane.setPrefSize(200, 100);
+    pane.setAlignment(Pos.CENTER);
+    dialog.getDialogPane().setContent(pane);
+    dialog.setTitle("Saving NetworkTables Recording...");
+    dialog.initOwner(window);
+    dialog.initModality(Modality.WINDOW_MODAL);
+    dialog.show();
 
-      //Header
-      sink.write("[[NETWORKTABLES RECORDING]]\n");
-      sink.write("[[DATE: " + LocalDateTime.now() + "]]\n");
+    new Thread(() -> {
+      try {
+        FileWriter writer = new FileWriter(file);
 
-      //Data
-      values.keySet()
-          .parallelStream()
-          .sorted()
-          .forEachOrdered(key -> {
-            try {
-              sink.write(StringEscapeUtils.escapeXSI(key.toString())
-                  + ";"
-                  + StringEscapeUtils.escapeXSI(values.get(key).getName())
-                  + ";"
-                  + StringEscapeUtils.escapeXSI(String.valueOf(values.get(key).getTypeValue()))
-                  + ";"
-                  + StringEscapeUtils.escapeXSI(values.get(key).getNewValue())
-                  + "\n");
-            } catch (IOException e) {
-              e.printStackTrace();
-            }
-          });
-    } finally {
-      join();
-    }
+        //Header
+        writer.write("[[NETWORKTABLES RECORDING]]\n");
+        writer.write("[[DATE: " + LocalDateTime.now() + "]]\n");
+
+        //Data
+        values.keySet()
+            .parallelStream()
+            .sorted()
+            .forEachOrdered(key -> {
+              try {
+                writer.write(StringEscapeUtils.escapeXSI(key.toString())
+                    + ";"
+                    + StringEscapeUtils.escapeXSI(values.get(key).getName())
+                    + ";"
+                    + StringEscapeUtils.escapeXSI(String.valueOf(values.get(key).getTypeValue()))
+                    + ";"
+                    + StringEscapeUtils.escapeXSI(values.get(key).getNewValue())
+                    + "\n");
+              } catch (IOException ignored) {
+              }
+            });
+
+        writer.flush();
+        writer.close();
+      } catch (IOException e) {
+        e.printStackTrace();
+      } finally {
+        Platform.runLater(() -> {
+          dialog.getDialogPane().getButtonTypes().add(ButtonType.CANCEL);
+          dialog.close();
+        });
+      }
+    }).start();
   }
 
   /**
@@ -274,81 +300,83 @@ public class NetworkTableRecorder extends Thread {
   }
 
   private void startPlayback() {
-    playbackThread = new Thread(() ->
-        playback.keySet()
-            .stream()
-            .sorted()
-            .forEachOrdered(time -> {
-              EntryChange change = playback.get(time);
-              NetworkTableEntry entry = NetworkTableUtilities.getNetworkTableInstance()
-                  .getEntry(change.getName());
+    playbackThread = new Thread(() -> {
+      playback.keySet()
+          .stream()
+          .sorted()
+          .forEachOrdered(time -> {
+            EntryChange change = playback.get(time);
+            NetworkTableEntry entry = NetworkTableUtilities.getNetworkTableInstance()
+                .getEntry(change.getName());
 
-              switch (change.getType()) {
-                case kDouble:
-                  if (change.getNewValue().equals("[[DELETED]]")) {
-                    entry.delete();
-                  } else {
-                    entry.setDouble(Double.parseDouble(change.getNewValue()));
-                  }
-                  break;
+            switch (change.getType()) {
+              case kDouble:
+                if (change.getNewValue().equals("[[DELETED]]")) {
+                  entry.delete();
+                } else {
+                  entry.setDouble(Double.parseDouble(change.getNewValue()));
+                }
+                break;
 
-                case kString:
-                  if (change.getNewValue().equals("[[DELETED]]")) {
-                    entry.delete();
-                  } else {
-                    entry.setString(change.getNewValue());
-                  }
-                  break;
+              case kString:
+                if (change.getNewValue().equals("[[DELETED]]")) {
+                  entry.delete();
+                } else {
+                  entry.setString(change.getNewValue());
+                }
+                break;
 
-                case kBoolean:
-                  if (change.getNewValue().equals("[[DELETED]]")) {
-                    entry.delete();
-                  } else {
-                    entry.setBoolean(Boolean.parseBoolean(change.getNewValue()));
-                  }
-                  break;
+              case kBoolean:
+                if (change.getNewValue().equals("[[DELETED]]")) {
+                  entry.delete();
+                } else {
+                  entry.setBoolean(Boolean.parseBoolean(change.getNewValue()));
+                }
+                break;
 
-                case kDoubleArray:
-                  if (change.getNewValue().equals("[[DELETED]]")) {
-                    entry.delete();
-                  } else {
-                    entry.setDoubleArray(parseDoubleArray(change.getNewValue()));
-                  }
-                  break;
+              case kDoubleArray:
+                if (change.getNewValue().equals("[[DELETED]]")) {
+                  entry.delete();
+                } else {
+                  entry.setDoubleArray(parseDoubleArray(change.getNewValue()));
+                }
+                break;
 
-                case kStringArray:
-                  if (change.getNewValue().equals("[[DELETED]]")) {
-                    entry.delete();
-                  } else {
-                    entry.setStringArray(parseStringArray(change.getNewValue()));
-                  }
-                  break;
+              case kStringArray:
+                if (change.getNewValue().equals("[[DELETED]]")) {
+                  entry.delete();
+                } else {
+                  entry.setStringArray(parseStringArray(change.getNewValue()));
+                }
+                break;
 
-                case kBooleanArray:
-                  if (change.getNewValue().equals("[[DELETED]]")) {
-                    entry.delete();
-                  } else {
-                    entry.setBooleanArray(parseBooleanArray(change.getNewValue()));
-                  }
-                  break;
+              case kBooleanArray:
+                if (change.getNewValue().equals("[[DELETED]]")) {
+                  entry.delete();
+                } else {
+                  entry.setBooleanArray(parseBooleanArray(change.getNewValue()));
+                }
+                break;
 
-                case kRaw:
-                  if (change.getNewValue().equals("[[DELETED]]")) {
-                    entry.delete();
-                  } else {
-                    entry.setRaw(parseByteArray(change.getNewValue()));
-                  }
-                  break;
+              case kRaw:
+                if (change.getNewValue().equals("[[DELETED]]")) {
+                  entry.delete();
+                } else {
+                  entry.setRaw(parseByteArray(change.getNewValue()));
+                }
+                break;
 
-                case kUnassigned:
-                  if (change.getNewValue().equals("[[DELETED]]")) {
-                    entry.delete();
-                  }
+              case kUnassigned:
+                if (change.getNewValue().equals("[[DELETED]]")) {
+                  entry.delete();
+                }
 
-                default:
-                  break;
-              }
-            }));
+              default:
+                break;
+            }
+          });
+      System.out.println("Done!");
+    });
     playbackThread.start();
   }
 
