@@ -1,5 +1,6 @@
 package edu.wpi.first.outlineviewer.controller;
 
+import com.google.common.primitives.Bytes;
 import edu.wpi.first.networktables.NetworkTableEntry;
 import edu.wpi.first.networktables.NetworkTableValue;
 import edu.wpi.first.networktables.PersistentException;
@@ -30,11 +31,11 @@ import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
 import javafx.scene.control.ButtonType;
 import javafx.scene.control.ContextMenu;
-import javafx.scene.control.Label;
 import javafx.scene.control.MenuItem;
 import javafx.scene.control.SelectionMode;
 import javafx.scene.control.SeparatorMenuItem;
 import javafx.scene.control.Slider;
+import java.util.stream.Collectors;
 import javafx.scene.control.TreeItem;
 import javafx.scene.control.TreeTableColumn;
 import javafx.scene.control.TreeTableRow;
@@ -47,7 +48,6 @@ import javafx.stage.FileChooser;
 import javafx.stage.Modality;
 import javafx.stage.StageStyle;
 import org.controlsfx.glyphfont.FontAwesome;
-import org.controlsfx.glyphfont.Glyph;
 
 /**
  * Controller for the main window.
@@ -247,7 +247,7 @@ public class MainWindowController {
         networkTableTreeRow.getKey(),
         new AddNumberArrayDialog(),
         (key, value) -> NetworkTableUtilities.getNetworkTableInstance()
-            .getEntry(key).setNumberArray((Number[]) Arrays.stream(value).boxed().toArray()));
+            .getEntry(key).setNumberArray(Arrays.stream(value).boxed().toArray(Double[]::new)));
 
     MenuItem boolArray = createContextMenuItem("Add boolean array",
         networkTableTreeRow.getKey(),
@@ -259,7 +259,10 @@ public class MainWindowController {
         networkTableTreeRow.getKey(),
         new AddBytesDialog(),
         (key, value) -> NetworkTableUtilities.getNetworkTableInstance()
-            .getEntry(key).setRaw(value));
+            .getEntry(key)
+            .setRaw(Bytes.toArray(
+                Arrays.stream(value).collect(Collectors.toList())
+            )));
 
     return Arrays.asList(string, number, bool,
                          new SeparatorMenuItem(),
