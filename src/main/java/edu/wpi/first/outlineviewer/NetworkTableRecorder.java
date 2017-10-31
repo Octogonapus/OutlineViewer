@@ -3,7 +3,16 @@ package edu.wpi.first.outlineviewer;
 import static edu.wpi.first.networktables.EntryListenerFlags.kDelete;
 import static edu.wpi.first.networktables.EntryListenerFlags.kNew;
 import static edu.wpi.first.networktables.EntryListenerFlags.kUpdate;
+import static edu.wpi.first.networktables.NetworkTableType.kBoolean;
+import static edu.wpi.first.networktables.NetworkTableType.kBooleanArray;
+import static edu.wpi.first.networktables.NetworkTableType.kDouble;
+import static edu.wpi.first.networktables.NetworkTableType.kDoubleArray;
+import static edu.wpi.first.networktables.NetworkTableType.kRaw;
+import static edu.wpi.first.networktables.NetworkTableType.kString;
+import static edu.wpi.first.networktables.NetworkTableType.kStringArray;
+import static edu.wpi.first.networktables.NetworkTableType.kUnassigned;
 
+import com.google.common.base.Stopwatch;
 import com.google.common.io.Files;
 import edu.wpi.first.networktables.NetworkTableEntry;
 import edu.wpi.first.networktables.NetworkTableType;
@@ -22,6 +31,9 @@ import java.util.List;
 import java.util.StringJoiner;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 import javafx.application.Platform;
 import javafx.beans.property.DoubleProperty;
@@ -54,7 +66,9 @@ public class NetworkTableRecorder extends Thread {
 
   private final ConcurrentHashMap<Long, EntryChange> playback;
   private Thread playbackThread = null;
+  private AtomicBoolean playbackShouldPause;
   private DoubleProperty playbackPercentage;
+  private AtomicLong playbackEndTime;
 
   public NetworkTableRecorder() {
     super();
@@ -64,7 +78,9 @@ public class NetworkTableRecorder extends Thread {
     state = new SimpleObjectProperty<>(State.NEW);
     values = new ConcurrentHashMap<>();
     playback = new ConcurrentHashMap<>();
+    playbackShouldPause = new AtomicBoolean(false);
     playbackPercentage = new SimpleDoubleProperty(0);
+    playbackEndTime = new AtomicLong(0);
   }
 
   @Override
@@ -193,6 +209,8 @@ public class NetworkTableRecorder extends Thread {
       }
     }
 
+    final long endTime = System.nanoTime();
+
     //Get lock on file
     File file = path.toFile();
     if (!file.exists()) {
@@ -237,6 +255,9 @@ public class NetworkTableRecorder extends Thread {
               }
             });
 
+        //Footer
+        writer.write("[[END TIME: " + endTime + "]]\n");
+
         writer.flush();
         writer.close();
       } catch (IOException e) {
@@ -275,7 +296,14 @@ public class NetworkTableRecorder extends Thread {
         String line;
         int lineCount = 0;
         while ((line = br.readLine()) != null) {
+          //Handle header
           if (lineCount++ <= 1) {
+            continue;
+          }
+
+          //Handle footer
+          if (line.startsWith("[[END TIME: ")) {
+            playbackEndTime.set(Long.parseLong(line.substring(13, line.length() - 2)));
             continue;
           }
 
@@ -337,95 +365,106 @@ public class NetworkTableRecorder extends Thread {
 
   private void startPlayback() {
     playbackThread = new Thread(() -> {
-      final long startTime = System.nanoTime();
+      List<Long> times = playback.keySet()
+          .parallelStream()
+          .sorted()
+          .collect(Collectors.toList());
+
       final int max = playback.size();
       final int[] completed = new int[]{0};
+      //StopWatch to control publishing timings
+      Stopwatch stopwatch = Stopwatch.createStarted();
+      final long endTime = playbackEndTime.get();
+      final long lastTime = times.get(times.size() - 1);
 
-      playback.keySet()
-          .stream()
-          .sorted()
-          .forEachOrdered(time -> {
-            long diff = System.nanoTime() - startTime;
-            if (diff < time) {
-              try {
-                Thread.sleep(Math.round((time - diff) / 1000000.0));
-              } catch (InterruptedException e) {
-                e.printStackTrace();
-              }
+      times.forEach(time -> {
+        //Wait until we should publish the new value
+        while (stopwatch.elapsed(TimeUnit.NANOSECONDS) < time) {
+          playbackPercentage.set((double)stopwatch.elapsed(TimeUnit.NANOSECONDS) / (double)lastTime);
+
+          if (playbackShouldPause.get()) {
+            stopwatch.stop();
+          } else if (!stopwatch.isRunning()) {
+            stopwatch.start();
+          }
+
+          try {
+            Thread.sleep(1);
+          } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+          }
+        }
+
+        EntryChange change = playback.get(time);
+        NetworkTableEntry entry = NetworkTableUtilities.getNetworkTableInstance()
+            .getEntry(change.getName());
+
+        switch (change.getType()) {
+          case kDouble:
+            if (change.getNewValue().equals("[[DELETED]]")) {
+              entry.delete();
+            } else {
+              entry.setDouble(Double.parseDouble(change.getNewValue()));
+            }
+            break;
+
+          case kString:
+            if (change.getNewValue().equals("[[DELETED]]")) {
+              entry.delete();
+            } else {
+              entry.setString(change.getNewValue());
+            }
+            break;
+
+          case kBoolean:
+            if (change.getNewValue().equals("[[DELETED]]")) {
+              entry.delete();
+            } else {
+              entry.setBoolean(Boolean.parseBoolean(change.getNewValue()));
+            }
+            break;
+
+          case kDoubleArray:
+            if (change.getNewValue().equals("[[DELETED]]")) {
+              entry.delete();
+            } else {
+              entry.setDoubleArray(parseDoubleArray(change.getNewValue()));
+            }
+            break;
+
+          case kStringArray:
+            if (change.getNewValue().equals("[[DELETED]]")) {
+              entry.delete();
+            } else {
+              entry.setStringArray(parseStringArray(change.getNewValue()));
+            }
+            break;
+
+          case kBooleanArray:
+            if (change.getNewValue().equals("[[DELETED]]")) {
+              entry.delete();
+            } else {
+              entry.setBooleanArray(parseBooleanArray(change.getNewValue()));
+            }
+            break;
+
+          case kRaw:
+            if (change.getNewValue().equals("[[DELETED]]")) {
+              entry.delete();
+            } else {
+              entry.setRaw(parseByteArray(change.getNewValue()));
+            }
+            break;
+
+          case kUnassigned:
+            if (change.getNewValue().equals("[[DELETED]]")) {
+              entry.delete();
             }
 
-            EntryChange change = playback.get(time);
-            NetworkTableEntry entry = NetworkTableUtilities.getNetworkTableInstance()
-                .getEntry(change.getName());
-
-            switch (change.getType()) {
-              case kDouble:
-                if (change.getNewValue().equals("[[DELETED]]")) {
-                  entry.delete();
-                } else {
-                  entry.setDouble(Double.parseDouble(change.getNewValue()));
-                }
-                break;
-
-              case kString:
-                if (change.getNewValue().equals("[[DELETED]]")) {
-                  entry.delete();
-                } else {
-                  entry.setString(change.getNewValue());
-                }
-                break;
-
-              case kBoolean:
-                if (change.getNewValue().equals("[[DELETED]]")) {
-                  entry.delete();
-                } else {
-                  entry.setBoolean(Boolean.parseBoolean(change.getNewValue()));
-                }
-                break;
-
-              case kDoubleArray:
-                if (change.getNewValue().equals("[[DELETED]]")) {
-                  entry.delete();
-                } else {
-                  entry.setDoubleArray(parseDoubleArray(change.getNewValue()));
-                }
-                break;
-
-              case kStringArray:
-                if (change.getNewValue().equals("[[DELETED]]")) {
-                  entry.delete();
-                } else {
-                  entry.setStringArray(parseStringArray(change.getNewValue()));
-                }
-                break;
-
-              case kBooleanArray:
-                if (change.getNewValue().equals("[[DELETED]]")) {
-                  entry.delete();
-                } else {
-                  entry.setBooleanArray(parseBooleanArray(change.getNewValue()));
-                }
-                break;
-
-              case kRaw:
-                if (change.getNewValue().equals("[[DELETED]]")) {
-                  entry.delete();
-                } else {
-                  entry.setRaw(parseByteArray(change.getNewValue()));
-                }
-                break;
-
-              case kUnassigned:
-                if (change.getNewValue().equals("[[DELETED]]")) {
-                  entry.delete();
-                }
-
-              default:
-                break;
-            }
-
-            playbackPercentage.set(completed[0]++ / (float) max);
-          });
+          default:
+            break;
+        }
+      });
     });
     playbackThread.setDaemon(true);
     playbackThread.start();
@@ -576,6 +615,20 @@ public class NetworkTableRecorder extends Thread {
     state.set(State.RUNNABLE);
   }
 
+  /**
+   * Pause playback of a recording.
+   */
+  public void pausePlayback() {
+
+  }
+
+  /**
+   * Resume playback of a recording.
+   */
+  public void unpausePlayback() {
+
+  }
+
   @Override
   public State getState() {
     return state.get();
@@ -596,7 +649,8 @@ public class NetworkTableRecorder extends Thread {
   private void waitTimestep() {
     try {
       sleep(1000);
-    } catch (InterruptedException ignored) {
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
     }
   }
 

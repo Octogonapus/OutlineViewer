@@ -27,8 +27,10 @@ import java.util.function.BiConsumer;
 import javafx.beans.property.ReadOnlyStringWrapper;
 import javafx.fxml.FXML;
 import javafx.scene.control.Alert;
+import javafx.scene.control.Button;
 import javafx.scene.control.ButtonType;
 import javafx.scene.control.ContextMenu;
+import javafx.scene.control.Label;
 import javafx.scene.control.MenuItem;
 import javafx.scene.control.SelectionMode;
 import javafx.scene.control.SeparatorMenuItem;
@@ -44,6 +46,8 @@ import javafx.scene.layout.Pane;
 import javafx.stage.FileChooser;
 import javafx.stage.Modality;
 import javafx.stage.StageStyle;
+import org.controlsfx.glyphfont.FontAwesome;
+import org.controlsfx.glyphfont.Glyph;
 
 /**
  * Controller for the main window.
@@ -65,6 +69,10 @@ public class MainWindowController {
   @FXML
   private TreeTableColumn<TreeRow, String> typeColumn;
 
+  @FXML
+  private Button playPauseButton;
+  @FXML
+  private Button rewindNTRecordButton;
   @FXML
   private Slider replaySlider;
   private NetworkTableRecorder ntRecorder;
@@ -352,6 +360,15 @@ public class MainWindowController {
       } catch (IOException ignored) {
       }
     }
+  }
+
+  @FXML
+  private void playPauseNTRecord() {
+    playPauseButton.setGraphic(new FontAwesome().create(FontAwesome.Glyph.PAUSE));
+  }
+
+  @FXML
+  private void rewindNTRecord() {
   }
 
   @FXML
