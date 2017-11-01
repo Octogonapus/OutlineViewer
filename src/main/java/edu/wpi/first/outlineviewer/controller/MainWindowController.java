@@ -223,12 +223,14 @@ public class MainWindowController {
     replaySlider.setMax(1);
     replaySlider.setDisable(true);
 
+    //Update the slider position as the recording plays
     ntRecorder.playbackPercentageProperty().get().addListener((observable, oldValue, newValue) -> {
       if (!ntRecorder.playbackIsPaused()) {
         Platform.runLater(() -> replaySlider.setValue(newValue.doubleValue()));
       }
     });
 
+    //If the recording isn't playing, let the user skip to a time
     replaySlider.valueChangingProperty().addListener((observable, oldValue, newValue) -> {
       if (ntRecorder.playbackIsPaused() && !newValue && oldValue) {
         enablePlayback();
