@@ -11,7 +11,6 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
@@ -92,7 +91,7 @@ public class NetworkTablePlayer {
 
           //Handle footer
           if (line.startsWith("[[END TIME: ")) {
-            playbackEndTime.set(Long.parseLong(line.substring(13, line.length() - 2)));
+            playbackEndTime.set(Long.parseLong(line.substring(12, line.length() - 2)));
             continue;
           }
 
@@ -159,11 +158,13 @@ public class NetworkTablePlayer {
    */
   public void startPlayback(long startTime) {
     //Don't play an empty recording
-    if (playback.size() == 0) {
+    //Can't start past the end
+    if (playback.size() == 0 || startTime >= playbackEndTime.get()) {
+      playbackDone.get().set(true);
       return;
     }
 
-    playbackDone.get().set(false);
+    final long lastTime = playbackEndTime.get();
 
     List<Long> times = playback.keySet()
         .parallelStream()
@@ -171,22 +172,26 @@ public class NetworkTablePlayer {
         .sorted()
         .collect(Collectors.toList());
 
+    times.add(lastTime);
+
     //Don't play an empty section
     if (times.size() == 0) {
+      playbackDone.get().set(true);
       return;
     }
 
     playbackThread = new Thread(() -> {
+      playbackDone.get().set(false);
+
       //StopWatch to control publishing timings
       Stopwatch stopwatch = Stopwatch.createStarted();
-      //final long endTime = playbackEndTime.get();
-      final long lastTime = times.get(times.size() - 1);
 
-      times.forEach(time -> {
+      for (Long time : times) {
         //Wait until we should publish the new value
         //startTime is used as an offset in case we are not starting at 0
         while (stopwatch.elapsed(TimeUnit.NANOSECONDS) + startTime < time) {
-          playbackPercentage.get().set(stopwatch.elapsed(TimeUnit.NANOSECONDS) / (double) lastTime);
+          playbackPercentage.get()
+              .set((stopwatch.elapsed(TimeUnit.NANOSECONDS) + startTime) / (double) lastTime);
 
           //Pause the stopwatch when playback is paused
           if (playbackIsPaused.get().get() && stopwatch.isRunning()) {
@@ -198,18 +203,21 @@ public class NetworkTablePlayer {
           try {
             Thread.sleep(1);
           } catch (InterruptedException e) {
-            break;
+            Thread.currentThread().interrupt(); //Rethrow to interrupt again
+            break; //Break out of for-each loop
           }
         }
 
-        //Get the change and entry
+        //Get the change
         EntryChange change = playback.get(time);
-        NetworkTableEntry entry
-            = NetworkTableUtilities.getNetworkTableInstance().getEntry(change.getName());
 
-        //Set the value of the change
-        setEntryValue(change, entry);
-      });
+        //Change is probably null for the ending time
+        if (change != null) {
+          //Set the value of the change
+          setEntryValue(change,
+              NetworkTableUtilities.getNetworkTableInstance().getEntry(change.getName()));
+        }
+      }
 
       playbackDone.get().set(true);
     });
@@ -313,15 +321,22 @@ public class NetworkTablePlayer {
   public void skipToTime(long time) {
     if (playbackThread != null) { //Null thread means we haven't started playback yet
       playbackThread.interrupt(); //Stop the playback thread
+      playbackIsPaused.get().set(false);
     }
+
+    //Delete the current entries
     Arrays.stream(NetworkTableUtilities
         .getNetworkTableInstance()
         .getEntries("", 0xFF))
         .forEach(NetworkTableEntry::delete);
-    Map<String, EntryChange> state = NetworkTableRecorderUtilities
-        .computeNetworkTableState(playback, time);
-    state.forEach((key, val) ->
-        setEntryValue(val, NetworkTableUtilities.getNetworkTableInstance().getEntry(key)));
+
+    //Publish the new entries
+    NetworkTableRecorderUtilities
+        .computeNetworkTableState(playback, time)
+        .forEach((key, val) ->
+            setEntryValue(val, NetworkTableUtilities.getNetworkTableInstance().getEntry(key)));
+
+    //Restart playback
     startPlayback(time);
   }
 
@@ -353,4 +368,7 @@ public class NetworkTablePlayer {
     return playbackPercentage;
   }
 
+  public AtomicLong getEndTime() {
+    return playbackEndTime;
+  }
 }

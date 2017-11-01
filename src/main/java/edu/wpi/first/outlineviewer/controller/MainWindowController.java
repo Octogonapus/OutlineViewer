@@ -220,8 +220,22 @@ public class MainWindowController {
     HBox.setHgrow(playerHBox, Priority.ALWAYS);
     replaySlider.setMin(0);
     replaySlider.setMax(1);
-    ntRecorder.playbackPercentageProperty().get().addListener(((observable, oldValue, newValue) ->
-        Platform.runLater(() -> replaySlider.valueProperty().setValue(newValue))));
+    replaySlider.setDisable(true);
+
+    ntRecorder.playbackPercentageProperty().get().addListener(((observable, oldValue, newValue) -> {
+      if (!ntRecorder.playbackIsPaused()) {
+        Platform.runLater(() -> replaySlider.setValue(newValue.doubleValue()));
+      }
+    }));
+
+    replaySlider.valueChangingProperty().addListener(((observable, oldValue, newValue) -> {
+      if (ntRecorder.playbackIsPaused()) {
+        if (!newValue && oldValue) {
+          enablePlayback();
+          ntRecorder.setReplayPercentage(replaySlider.getValue());
+        }
+      }
+    }));
   }
 
   /**
@@ -377,13 +391,23 @@ public class MainWindowController {
   private void playPauseNTRecord() {
     if (ntRecorder.playbackIsRunning()) {
       if (ntRecorder.playbackIsPaused()) {
-        ntRecorder.unpausePlayback();
-        playPauseButton.setGraphic(FONTAWESOME_PLAY);
+        enablePlayback();
       } else {
-        ntRecorder.pausePlayback();
-        playPauseButton.setGraphic(FONTAWESOME_PAUSE);
+        disablePlayback();
       }
     }
+  }
+
+  private void enablePlayback() {
+    replaySlider.setDisable(true);
+    ntRecorder.unpausePlayback();
+    playPauseButton.setGraphic(FONTAWESOME_PLAY);
+  }
+
+  private void disablePlayback() {
+    replaySlider.setDisable(false);
+    ntRecorder.pausePlayback();
+    playPauseButton.setGraphic(FONTAWESOME_PAUSE);
   }
 
   @FXML

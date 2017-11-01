@@ -133,10 +133,10 @@ public class NetworkTableRecorder extends Thread {
   private void saveEntry(String key, NetworkTableType type, String newValue, boolean wasDeleted) {
     //Save with time relative to the start of the recording
     if (wasDeleted) {
-      recording.put(System.nanoTime() - startTime,
+      recording.put(timeSinceStart(),
           new EntryChange(key, type, "[[DELETED]]"));
     } else {
-      recording.put(System.nanoTime() - startTime,
+      recording.put(timeSinceStart(),
           new EntryChange(key, type, newValue));
     }
   }
@@ -198,7 +198,7 @@ public class NetworkTableRecorder extends Thread {
     }
 
     //Ending time of the recording -- just after the main thread exits
-    final long endTime = System.nanoTime();
+    final long endTime = timeSinceStart();
 
     //Get lock on file
     File file = path.toFile();
@@ -316,6 +316,10 @@ public class NetworkTableRecorder extends Thread {
     player.rewind();
   }
 
+  public void setReplayPercentage(Number newValue) {
+    player.skipToTime((long) (newValue.doubleValue() * player.getEndTime().get()));
+  }
+
   @Override
   public State getState() {
     return state.get();
@@ -352,4 +356,11 @@ public class NetworkTableRecorder extends Thread {
     }
   }
 
+  /**
+   * Compute the time since the start of the recording.
+   * @return The time recording started
+   */
+  private long timeSinceStart() {
+    return System.nanoTime() - startTime;
+  }
 }
