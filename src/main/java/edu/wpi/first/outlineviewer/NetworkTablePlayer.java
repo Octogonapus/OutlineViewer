@@ -9,6 +9,7 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -183,7 +184,7 @@ public class NetworkTablePlayer {
           try {
             Thread.sleep(1);
           } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
+            break;
           }
         }
 
@@ -264,7 +265,7 @@ public class NetworkTablePlayer {
         }
       });
 
-      playbackDone.get().set(false);
+      playbackDone.get().set(true);
     });
 
     //Playback should not prevent closing
@@ -281,7 +282,14 @@ public class NetworkTablePlayer {
   }
 
   public void rewind() {
-    //TODO: rewind
+    if (playbackThread != null) { //Null thread means we haven't started playback yet
+      playbackThread.interrupt(); //Stop the playback thread
+      Arrays.stream(NetworkTableUtilities
+          .getNetworkTableInstance()
+          .getEntries("", 0xFF))
+          .forEach(NetworkTableEntry::delete);
+      startPlayback();
+    }
   }
 
   public boolean isDone() {

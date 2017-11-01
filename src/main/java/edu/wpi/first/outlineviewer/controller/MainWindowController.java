@@ -43,7 +43,9 @@ import javafx.scene.control.TreeTableView;
 import javafx.scene.control.cell.TreeItemPropertyValueFactory;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.MouseEvent;
+import javafx.scene.layout.HBox;
 import javafx.scene.layout.Pane;
+import javafx.scene.layout.Priority;
 import javafx.stage.FileChooser;
 import javafx.stage.Modality;
 import javafx.stage.StageStyle;
@@ -70,6 +72,8 @@ public class MainWindowController {
   @FXML
   private TreeTableColumn<TreeRow, String> typeColumn;
 
+  @FXML
+  private HBox playerHBox;
   @FXML
   private Button playPauseButton;
   @FXML
@@ -212,6 +216,7 @@ public class MainWindowController {
     });
 
     ntRecorder = new NetworkTableRecorder();
+    HBox.setHgrow(playerHBox, Priority.ALWAYS);
     replaySlider.setMin(0);
     replaySlider.setMax(1);
     replaySlider.valueProperty().bind(ntRecorder.playbackPercentageProperty().get());

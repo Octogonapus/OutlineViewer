@@ -14,7 +14,6 @@
 <?import javafx.scene.layout.BorderPane?>
 <?import javafx.scene.layout.HBox?>
 <?import javafx.scene.layout.VBox?>
-
 <?import org.controlsfx.glyphfont.Glyph?>
 <BorderPane id="root" fx:id="root" maxHeight="16000" maxWidth="16000" minHeight="400" minWidth="600" prefHeight="400.0" prefWidth="600.0" xmlns="http://javafx.com/javafx/8.0.121" xmlns:fx="http://javafx.com/fxml/1" fx:controller="edu.wpi.first.outlineviewer.controller.MainWindowController">
     <top>
@@ -42,12 +41,12 @@
         </NetworkTableTree>
     </center>
     <bottom>
-        <VBox spacing="5">
+        <VBox alignment="CENTER">
             <fx:include id="connectionIndicator" source="ConnectionIndicator.fxml" />
-            <HBox alignment="CENTER" spacing="5">
+            <HBox id="playerHBox" fx:id="playerHBox" alignment="CENTER" spacing="5">
             <Button fx:id="playPauseButton" mnemonicParsing="false" onAction="#playPauseNTRecord">
                 <graphic>
-                    <Glyph fontFamily="FontAwesome" icon="play"/>
+                    <Glyph fontFamily="FontAwesome" icon="play" />
                 </graphic>
             </Button>
             <Button fx:id="rewindNTRecordButton" layoutX="207.0" layoutY="10.0" mnemonicParsing="false" onAction="#rewindNTRecord">
@@ -55,11 +54,17 @@
                     <Glyph fontFamily="FontAwesome" icon="fast_backward" />
                 </graphic>
             </Button>
-                <Slider id="replaySlider" fx:id="replaySlider">
+                <Slider id="replaySlider" fx:id="replaySlider" HBox.hgrow="ALWAYS">
                     <padding>
                         <Insets bottom="5.0" left="5.0" right="5.0" />
                     </padding>
                 </Slider>
+            <VBox.margin>
+               <Insets />
+            </VBox.margin>
+            <padding>
+               <Insets bottom="5.0" left="5.0" right="5.0" top="5.0" />
+            </padding>
             </HBox>
         </VBox>
 
