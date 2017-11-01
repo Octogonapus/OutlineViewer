@@ -4,32 +4,20 @@ import static edu.wpi.first.networktables.EntryListenerFlags.kDelete;
 import static edu.wpi.first.networktables.EntryListenerFlags.kNew;
 import static edu.wpi.first.networktables.EntryListenerFlags.kUpdate;
 
-import com.google.common.base.Stopwatch;
 import com.google.common.io.Files;
 import edu.wpi.first.networktables.NetworkTableEntry;
 import edu.wpi.first.networktables.NetworkTableType;
 import edu.wpi.first.outlineviewer.model.EntryChange;
 import edu.wpi.first.outlineviewer.model.NetworkTableRecord;
-import java.io.BufferedReader;
 import java.io.File;
-import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.LocalDateTime;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicLong;
-import java.util.stream.Collectors;
+import java.util.concurrent.atomic.AtomicReference;
 import javafx.application.Platform;
 import javafx.beans.property.DoubleProperty;
-import javafx.beans.property.SimpleDoubleProperty;
 import javafx.beans.property.SimpleObjectProperty;
 import javafx.geometry.Pos;
 import javafx.scene.control.ButtonType;
@@ -54,12 +42,7 @@ public class NetworkTableRecorder extends Thread {
   private final SimpleObjectProperty<Thread.State> state;
 
   private long startTime;
-
-  private final NetworkTableRecord playback = new NetworkTableRecord();
-  private Thread playbackThread = null;
-  private AtomicBoolean playbackIsPaused;
-  private DoubleProperty playbackPercentage;
-  private AtomicLong playbackEndTime;
+  private final NetworkTablePlayer player;
 
   public NetworkTableRecorder() {
     super();
@@ -67,9 +50,7 @@ public class NetworkTableRecorder extends Thread {
     keepRunning = true;
     isPaused = false;
     state = new SimpleObjectProperty<>(State.NEW);
-    playbackIsPaused = new AtomicBoolean(false);
-    playbackPercentage = new SimpleDoubleProperty(0);
-    playbackEndTime = new AtomicLong(0);
+    player = new NetworkTablePlayer();
   }
 
   @Override
@@ -113,7 +94,7 @@ public class NetworkTableRecorder extends Thread {
     while (keepRunning) {
       //Paused means stop recording and wait
       if (isPaused) {
-        if (playbackThread != null && playbackThread.getState().equals(State.TERMINATED)) {
+        if (player.isDone()) {
           unpause(); //Playback is done so go back to recording
         }
         state.set(State.WAITING);
@@ -131,7 +112,7 @@ public class NetworkTableRecorder extends Thread {
   }
 
   /**
-   * Save a change to an entry into the record
+   * Save a change to an entry into the record.
    *
    * @param key Name of entry
    * @param type Type of entry
@@ -142,7 +123,7 @@ public class NetworkTableRecorder extends Thread {
   }
 
   /**
-   * Save a change to an entry into the record
+   * Save a change to an entry into the record.
    *
    * @param key Name of entry
    * @param type Type of entry
@@ -285,212 +266,15 @@ public class NetworkTableRecorder extends Thread {
   }
 
   /**
-   * Load a NetworkTables recording from a file and play it back.
+   * Load a NetworkTables recording from a file and start playing it.
    *
    * @param file Recording file
-   * @throws IOException Loading the file could produce an IOException
+   * @param window Window to show loading dialog in
    */
-  public void load(File file, Window window) throws IOException {
-    //ProgressIndicator for loading a recording
-    ProgressIndicator progressIndicator = new ProgressIndicator();
-    Dialog<String> dialog = new Dialog<>();
-    StackPane pane = new StackPane(progressIndicator);
-    pane.setPrefSize(200, 100);
-    pane.setAlignment(Pos.CENTER);
-    dialog.getDialogPane().setContent(pane);
-    dialog.setTitle("Loading NetworkTables Recording...");
-    dialog.initOwner(window);
-    dialog.initModality(Modality.WINDOW_MODAL);
-    dialog.show();
-
-    //CountDownLatch to wait for the thread to finish so the dialog and thread run at the same time
-    CountDownLatch latch = new CountDownLatch(1);
-
-    new Thread(() -> {
-      try (BufferedReader br = new BufferedReader(new FileReader(file))) {
-        String line;
-        int lineCount = 0;
-        while ((line = br.readLine()) != null) {
-          //Handle header
-          if (lineCount++ <= 1) {
-            continue;
-          }
-
-          //Handle footer
-          if (line.startsWith("[[END TIME: ")) {
-            playbackEndTime.set(Long.parseLong(line.substring(13, line.length() - 2)));
-            continue;
-          }
-
-          String time = NetworkTableRecorderUtilities.findSubstring(line,
-              0,
-              ';',
-              true);
-
-          String key = NetworkTableRecorderUtilities.findSubstring(line,
-              time.length() + 1,
-              ';',
-              true);
-
-          String type = NetworkTableRecorderUtilities.findSubstring(line,
-              time.length() + key.length() + 2,
-              ';',
-              true);
-
-          String value = NetworkTableRecorderUtilities.findSubstring(line,
-              time.length() + key.length() + type.length() + 3,
-              ';',
-              true);
-
-          time = StringEscapeUtils.unescapeXSI(time);
-          key = StringEscapeUtils.unescapeXSI(key);
-          type = StringEscapeUtils.unescapeXSI(type);
-          value
-              = StringEscapeUtils.unescapeXSI(value); //TODO: Can we suppress checkstyle distance
-          // check here?
-
-          //Construct a new entry in the playback record
-          playback.put(
-              Long.parseLong(time),
-              new EntryChange(key,
-                  NetworkTableType.getFromInt(Integer.parseInt(type)),
-                  value));
-        }
-      } catch (IOException e) {
-        //TODO: Log this
-      } finally {
-        Platform.runLater(() -> {
-          dialog.getDialogPane().getButtonTypes().add(ButtonType.CANCEL);
-          dialog.close();
-        });
-        latch.countDown();
-      }
-    }).start();
-
-    //Wait for loading to finish
-    try {
-      latch.await();
-    } catch (InterruptedException e) {
-      //TODO: This should be ignored, and we should just move onto playing the recording
-    }
-
-    //Pause recording and start playing the recording
-    pause();
-    startPlayback();
-  }
-
-  private void startPlayback() {
-    playbackThread = new Thread(() -> {
-      List<Long> times = playback.keySet()
-          .parallelStream()
-          .sorted()
-          .collect(Collectors.toList());
-
-      //StopWatch to control publishing timings
-      Stopwatch stopwatch = Stopwatch.createStarted();
-      //final long endTime = playbackEndTime.get();
-      final long lastTime = times.get(times.size() - 1);
-
-      times.forEach(time -> {
-        //Wait until we should publish the new value
-        while (stopwatch.elapsed(TimeUnit.NANOSECONDS) < time) {
-          playbackPercentage.set(stopwatch.elapsed(TimeUnit.NANOSECONDS) / (double) lastTime);
-
-          //Pause the stopwatch when playback is paused
-          if (playbackIsPaused.get() && stopwatch.isRunning()) {
-            stopwatch.stop();
-          } else if (!playbackIsPaused.get() && !stopwatch.isRunning()) {
-            stopwatch.start();
-          }
-
-          try {
-            Thread.sleep(1);
-          } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-          }
-        }
-
-        //Get the change and entry
-        EntryChange change = playback.get(time);
-        NetworkTableEntry entry
-            = NetworkTableUtilities.getNetworkTableInstance().getEntry(change.getName());
-
-        //Set the value of the change
-        switch (change.getType()) {
-          case kDouble:
-            if (change.getNewValue().equals("[[DELETED]]")) {
-              entry.delete();
-            } else {
-              entry.setDouble(Double.parseDouble(change.getNewValue()));
-            }
-            break;
-
-          case kString:
-            if (change.getNewValue().equals("[[DELETED]]")) {
-              entry.delete();
-            } else {
-              entry.setString(change.getNewValue());
-            }
-            break;
-
-          case kBoolean:
-            if (change.getNewValue().equals("[[DELETED]]")) {
-              entry.delete();
-            } else {
-              entry.setBoolean(Boolean.parseBoolean(change.getNewValue()));
-            }
-            break;
-
-          case kDoubleArray:
-            if (change.getNewValue().equals("[[DELETED]]")) {
-              entry.delete();
-            } else {
-              entry.setDoubleArray(
-                  NetworkTableRecorderUtilities.parseDoubleArray(change.getNewValue()));
-            }
-            break;
-
-          case kStringArray:
-            if (change.getNewValue().equals("[[DELETED]]")) {
-              entry.delete();
-            } else {
-              entry.setStringArray(
-                  NetworkTableRecorderUtilities.parseStringArray(change.getNewValue()));
-            }
-            break;
-
-          case kBooleanArray:
-            if (change.getNewValue().equals("[[DELETED]]")) {
-              entry.delete();
-            } else {
-              entry.setBooleanArray(
-                  NetworkTableRecorderUtilities.parseBooleanArray(change.getNewValue()));
-            }
-            break;
-
-          case kRaw:
-            if (change.getNewValue().equals("[[DELETED]]")) {
-              entry.delete();
-            } else {
-              entry.setRaw(NetworkTableRecorderUtilities.parseByteArray(change.getNewValue()));
-            }
-            break;
-
-          case kUnassigned:
-            if (change.getNewValue().equals("[[DELETED]]")) {
-              entry.delete();
-            }
-            break;
-
-          default:
-            break;
-        }
-      });
-    });
-
-    //Playback should not prevent closing
-    playbackThread.setDaemon(true);
-    playbackThread.start();
+  public void load(File file, Window window) {
+    player.loadRecording(file, window);
+    pause(); //Pause recording
+    player.startPlayback();
   }
 
   /**
@@ -513,21 +297,21 @@ public class NetworkTableRecorder extends Thread {
    * Pause playback of a recording.
    */
   public void pausePlayback() {
-    playbackIsPaused.set(true);
+    player.pause();
   }
 
   /**
    * Resume playback of a recording.
    */
   public void unpausePlayback() {
-    playbackIsPaused.set(false);
+    player.unpause();
   }
 
   /**
    * Rewinds playback of a recording to the start.
    */
   public void rewindPlayback() {
-    //TODO: rewind to start
+    player.rewind();
   }
 
   @Override
@@ -540,15 +324,19 @@ public class NetworkTableRecorder extends Thread {
   }
 
   public double getPlaybackPercentage() {
-    return playbackPercentage.get();
+    return player.getPlaybackPercentage();
   }
 
-  public DoubleProperty playbackPercentageProperty() {
-    return playbackPercentage;
+  public AtomicReference<DoubleProperty> playbackPercentageProperty() {
+    return player.playbackProgressProperty();
   }
 
-  public AtomicBoolean getPlaybackIsPaused() {
-    return playbackIsPaused;
+  public boolean playbackIsPaused() {
+    return player.isPaused();
+  }
+
+  public boolean playbackIsRunning() {
+    return player.isRunning();
   }
 
   /**

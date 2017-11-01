@@ -25,9 +25,9 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
 import java.util.function.BiConsumer;
+import java.util.stream.Collectors;
 import javafx.beans.property.ReadOnlyStringWrapper;
 import javafx.fxml.FXML;
-import javafx.scene.Node;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
 import javafx.scene.control.ButtonType;
@@ -36,7 +36,6 @@ import javafx.scene.control.MenuItem;
 import javafx.scene.control.SelectionMode;
 import javafx.scene.control.SeparatorMenuItem;
 import javafx.scene.control.Slider;
-import java.util.stream.Collectors;
 import javafx.scene.control.TreeItem;
 import javafx.scene.control.TreeTableColumn;
 import javafx.scene.control.TreeTableRow;
@@ -215,7 +214,7 @@ public class MainWindowController {
     ntRecorder = new NetworkTableRecorder();
     replaySlider.setMin(0);
     replaySlider.setMax(1);
-    replaySlider.valueProperty().bind(ntRecorder.playbackPercentageProperty());
+    replaySlider.valueProperty().bind(ntRecorder.playbackPercentageProperty().get());
   }
 
   /**
@@ -363,22 +362,20 @@ public class MainWindowController {
         "*" + NetworkTableRecorder.NTR_EXTENSION));
     File selected = fileChooser.showOpenDialog(root.getScene().getWindow());
     if (selected != null) {
-      try {
-        ntRecorder.load(selected, root.getScene().getWindow());
-      } catch (IOException ignored) {
-        //TODO: Log this
-      }
+      ntRecorder.load(selected, root.getScene().getWindow());
     }
   }
 
   @FXML
   private void playPauseNTRecord() {
-    if (ntRecorder.getPlaybackIsPaused().get()) {
-      ntRecorder.unpausePlayback();
-      playPauseButton.setGraphic(FONTAWESOME_PLAY);
-    } else {
-      ntRecorder.pausePlayback();
-      playPauseButton.setGraphic(FONTAWESOME_PAUSE);
+    if (ntRecorder.playbackIsRunning()) {
+      if (ntRecorder.playbackIsPaused()) {
+        ntRecorder.unpausePlayback();
+        playPauseButton.setGraphic(FONTAWESOME_PLAY);
+      } else {
+        ntRecorder.pausePlayback();
+        playPauseButton.setGraphic(FONTAWESOME_PAUSE);
+      }
     }
   }
 
