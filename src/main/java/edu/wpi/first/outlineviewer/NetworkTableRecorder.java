@@ -222,38 +222,40 @@ public class NetworkTableRecorder extends Thread {
     //This is not a daemon because we want to make sure we save before exiting
     new Thread(() -> {
       try {
-        FileWriter writer = new FileWriter(file);
+        try (FileWriter writer = new FileWriter(file)) {
 
-        //Header
-        writer.write("[[NETWORKTABLES RECORDING]]\n");
-        writer.write("[[DATE: " + LocalDateTime.now() + "]]\n");
+          //Header
+          writer.write("[[NETWORKTABLES RECORDING]]\n");
+          writer.write("[[DATE: " + LocalDateTime.now() + "]]\n");
 
-        //Data
-        recording.keySet()
-            .parallelStream()
-            .sorted()
-            .forEachOrdered(key -> {
-              try {
-                writer.write(StringEscapeUtils.escapeXSI(key.toString())
-                    + ";"
-                    + StringEscapeUtils.escapeXSI(recording.get(key).getName())
-                    + ";"
-                    + StringEscapeUtils.escapeXSI(String.valueOf(recording.get(key).getTypeValue()))
-                    + ";"
-                    + StringEscapeUtils.escapeXSI(recording.get(key).getNewValue())
-                    + "\n");
-              } catch (IOException ignored) {
-                //TODO: Log this
-              }
-            });
+          //Data
+          recording.keySet()
+              .parallelStream()
+              .sorted()
+              .forEachOrdered(key -> {
+                try {
+                  writer.write(StringEscapeUtils.escapeXSI(key.toString())
+                      + ";"
+                      + StringEscapeUtils.escapeXSI(recording.get(key).getName())
+                      + ";"
+                      + StringEscapeUtils.escapeXSI(
+                      String.valueOf(recording.get(key).getTypeValue()))
+                      + ";"
+                      + StringEscapeUtils.escapeXSI(recording.get(key).getNewValue())
+                      + "\n");
+                } catch (IOException e) {
+                  //TODO: Log this
+                }
+              });
 
-        //Footer
-        writer.write("[[END TIME: " + endTime + "]]\n");
+          //Footer
+          writer.write("[[END TIME: " + endTime + "]]\n");
 
-        writer.flush();
-        writer.close();
-      } catch (IOException e) {
-        //TODO: Log this
+          writer.flush();
+          writer.close();
+        } catch (IOException e) {
+          //TODO: Log this
+        }
       } finally {
         //In order to close the dialog, we cheekily add a Button before the user notices and then
         //close it

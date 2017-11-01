@@ -58,6 +58,7 @@ public class NetworkTablePlayer {
    * @param file Recording file
    * @param window Window to show loading dialog in
    */
+  @SuppressWarnings("checkstyle:VariableDeclarationUsageDistance")
   public void loadRecording(File file, Window window) {
     this.file = file;
     this.window = window;
@@ -117,7 +118,6 @@ public class NetworkTablePlayer {
           key = StringEscapeUtils.unescapeXSI(key);
           type = StringEscapeUtils.unescapeXSI(type);
           value = StringEscapeUtils.unescapeXSI(value);
-          //TODO: Can we suppress checkstyle distance check here?
 
           //Construct a new entry in the playback record
           playback.put(
