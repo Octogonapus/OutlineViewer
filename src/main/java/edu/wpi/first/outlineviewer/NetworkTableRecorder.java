@@ -130,11 +130,27 @@ public class NetworkTableRecorder extends Thread {
     state.set(State.TERMINATED);
   }
 
+  /**
+   * Save a change to an entry into the record
+   *
+   * @param key Name of entry
+   * @param type Type of entry
+   * @param newValue New value of entry
+   */
   private void saveEntry(String key, NetworkTableType type, String newValue) {
     saveEntry(key, type, newValue, false);
   }
 
+  /**
+   * Save a change to an entry into the record
+   *
+   * @param key Name of entry
+   * @param type Type of entry
+   * @param newValue New value of entry
+   * @param wasDeleted Whether the entry was deleted
+   */
   private void saveEntry(String key, NetworkTableType type, String newValue, boolean wasDeleted) {
+    //Save with time relative to the start of the recording
     if (wasDeleted) {
       recording.put(System.nanoTime() - startTime,
           new EntryChange(key, type, "[[DELETED]]"));
@@ -155,11 +171,12 @@ public class NetworkTableRecorder extends Thread {
   public void saveAndJoin(Window window) throws IOException, InterruptedException {
     FileChooser chooser = new FileChooser();
     chooser.setTitle("Save NetworkTables Recording");
-    chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("NetworkTables Recording",
-        "*" + NTR_EXTENSION)); // "*.ntr"
+    chooser.getExtensionFilters().add(
+        new FileChooser.ExtensionFilter("NetworkTables Recording",
+            "*" + NTR_EXTENSION)); // "*.ntr"
     File result = chooser.showSaveDialog(window);
     if (result != null) {
-      //Null means the user hit cancel or didn't select a file and therefore doesn't want to save
+      //Null means the user hit cancel or didn't select a file and therefore doesn't want to save,
       //so only save if the file is not null
       saveAndJoin(result.toPath(), window);
     }
@@ -199,6 +216,7 @@ public class NetworkTableRecorder extends Thread {
       }
     }
 
+    //Ending time of the recording -- just after the main thread exits
     final long endTime = System.nanoTime();
 
     //Get lock on file
@@ -208,6 +226,7 @@ public class NetworkTableRecorder extends Thread {
       Files.touch(file);
     }
 
+    //ProgressIndicator while the recording is saved
     ProgressIndicator progressIndicator = new ProgressIndicator();
     Dialog<String> dialog = new Dialog<>();
     StackPane pane = new StackPane(progressIndicator);
@@ -219,6 +238,7 @@ public class NetworkTableRecorder extends Thread {
     dialog.initModality(Modality.WINDOW_MODAL);
     dialog.show();
 
+    //This is not a daemon because we want to make sure we save before exiting
     new Thread(() -> {
       try {
         FileWriter writer = new FileWriter(file);
@@ -252,8 +272,10 @@ public class NetworkTableRecorder extends Thread {
         writer.flush();
         writer.close();
       } catch (IOException e) {
-        e.printStackTrace();
+        //TODO: Log this
       } finally {
+        //In order to close the dialog, we cheekily add a Button before the user notices and then
+        //close it
         Platform.runLater(() -> {
           dialog.getDialogPane().getButtonTypes().add(ButtonType.CANCEL);
           dialog.close();
@@ -269,6 +291,7 @@ public class NetworkTableRecorder extends Thread {
    * @throws IOException Loading the file could produce an IOException
    */
   public void load(File file, Window window) throws IOException {
+    //ProgressIndicator for loading a recording
     ProgressIndicator progressIndicator = new ProgressIndicator();
     Dialog<String> dialog = new Dialog<>();
     StackPane pane = new StackPane(progressIndicator);
@@ -280,6 +303,7 @@ public class NetworkTableRecorder extends Thread {
     dialog.initModality(Modality.WINDOW_MODAL);
     dialog.show();
 
+    //CountDownLatch to wait for the thread to finish so the dialog and thread run at the same time
     CountDownLatch latch = new CountDownLatch(1);
 
     new Thread(() -> {
@@ -321,9 +345,13 @@ public class NetworkTableRecorder extends Thread {
           time = StringEscapeUtils.unescapeXSI(time);
           key = StringEscapeUtils.unescapeXSI(key);
           type = StringEscapeUtils.unescapeXSI(type);
-          value = StringEscapeUtils.unescapeXSI(value); //TODO: Can we suppress checkstyle distance check here?
+          value
+              = StringEscapeUtils.unescapeXSI(value); //TODO: Can we suppress checkstyle distance
+          // check here?
 
-          playback.put(Long.parseLong(time),
+          //Construct a new entry in the playback record
+          playback.put(
+              Long.parseLong(time),
               new EntryChange(key,
                   NetworkTableType.getFromInt(Integer.parseInt(type)),
                   value));
@@ -339,12 +367,14 @@ public class NetworkTableRecorder extends Thread {
       }
     }).start();
 
+    //Wait for loading to finish
     try {
       latch.await();
     } catch (InterruptedException e) {
       //TODO: This should be ignored, and we should just move onto playing the recording
     }
 
+    //Pause recording and start playing the recording
     pause();
     startPlayback();
   }
@@ -366,6 +396,7 @@ public class NetworkTableRecorder extends Thread {
         while (stopwatch.elapsed(TimeUnit.NANOSECONDS) < time) {
           playbackPercentage.set(stopwatch.elapsed(TimeUnit.NANOSECONDS) / (double) lastTime);
 
+          //Pause the stopwatch when playback is paused
           if (playbackIsPaused.get() && stopwatch.isRunning()) {
             stopwatch.stop();
           } else if (!playbackIsPaused.get() && !stopwatch.isRunning()) {
@@ -379,10 +410,12 @@ public class NetworkTableRecorder extends Thread {
           }
         }
 
+        //Get the change and entry
         EntryChange change = playback.get(time);
         NetworkTableEntry entry
             = NetworkTableUtilities.getNetworkTableInstance().getEntry(change.getName());
 
+        //Set the value of the change
         switch (change.getType()) {
           case kDouble:
             if (change.getNewValue().equals("[[DELETED]]")) {
@@ -454,6 +487,8 @@ public class NetworkTableRecorder extends Thread {
         }
       });
     });
+
+    //Playback should not prevent closing
     playbackThread.setDaemon(true);
     playbackThread.start();
   }
