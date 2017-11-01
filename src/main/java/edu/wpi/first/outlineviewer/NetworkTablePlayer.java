@@ -1,7 +1,6 @@
 package edu.wpi.first.outlineviewer;
 
 import com.google.common.base.Stopwatch;
-import edu.wpi.first.networktables.NetworkTable;
 import edu.wpi.first.networktables.NetworkTableEntry;
 import edu.wpi.first.networktables.NetworkTableType;
 import edu.wpi.first.outlineviewer.model.EntryChange;
@@ -171,6 +170,11 @@ public class NetworkTablePlayer {
         .filter(time -> time >= startTime) //If we aren't starting at 0, we need to drop the past
         .sorted()
         .collect(Collectors.toList());
+
+    //Don't play an empty section
+    if (times.size() == 0) {
+      return;
+    }
 
     playbackThread = new Thread(() -> {
       //StopWatch to control publishing timings

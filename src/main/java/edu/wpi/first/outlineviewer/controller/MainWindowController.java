@@ -26,6 +26,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.function.BiConsumer;
 import java.util.stream.Collectors;
+import javafx.application.Platform;
 import javafx.beans.property.ReadOnlyStringWrapper;
 import javafx.fxml.FXML;
 import javafx.scene.control.Alert;
@@ -177,7 +178,7 @@ public class MainWindowController {
       // so we only select the entry that was clicked on.
       if (tableView.getSelectionModel().getSelectedItems().size() > 1) {
         tableView.getSelectionModel()
-                 .clearAndSelect(tableView.getSelectionModel().getSelectedIndex());
+            .clearAndSelect(tableView.getSelectionModel().getSelectedIndex());
       }
 
       TreeItem<TreeRow> selected = tableView.getSelectionModel().getSelectedItem();
@@ -219,7 +220,8 @@ public class MainWindowController {
     HBox.setHgrow(playerHBox, Priority.ALWAYS);
     replaySlider.setMin(0);
     replaySlider.setMax(1);
-    replaySlider.valueProperty().bind(ntRecorder.playbackPercentageProperty().get());
+    ntRecorder.playbackPercentageProperty().get().addListener(((observable, oldValue, newValue) ->
+        Platform.runLater(() -> replaySlider.valueProperty().setValue(newValue))));
   }
 
   /**
@@ -274,10 +276,10 @@ public class MainWindowController {
             )));
 
     return Arrays.asList(string, number, bool,
-                         new SeparatorMenuItem(),
-                         stringArray, numberArray, boolArray,
-                         new SeparatorMenuItem(),
-                         raw);
+        new SeparatorMenuItem(),
+        stringArray, numberArray, boolArray,
+        new SeparatorMenuItem(),
+        raw);
   }
 
   /**
@@ -285,11 +287,11 @@ public class MainWindowController {
    */
   private void deleteSelectedEntries() {
     tableView.getSelectionModel()
-             .getSelectedItems()
-             .stream()
-             .map(TreeItem::getValue)
-             .map(TreeRow::getKey)
-             .forEach(NetworkTableUtilities::delete);
+        .getSelectedItems()
+        .stream()
+        .map(TreeItem::getValue)
+        .map(TreeRow::getKey)
+        .forEach(NetworkTableUtilities::delete);
   }
 
   @FXML
@@ -309,8 +311,8 @@ public class MainWindowController {
     FileChooser fileChooser = new FileChooser();
     fileChooser.setTitle("Load NetworkTables State");
     fileChooser.getExtensionFilters().addAll(
-            new FileChooser.ExtensionFilter("NT State", "*.ini"),
-            new FileChooser.ExtensionFilter("All Files", "*", "*.*")
+        new FileChooser.ExtensionFilter("NT State", "*.ini"),
+        new FileChooser.ExtensionFilter("All Files", "*", "*.*")
     );
     File file = fileChooser.showOpenDialog(root.getScene().getWindow());
     if (file != null) {
@@ -402,7 +404,7 @@ public class MainWindowController {
     MenuItem menuItem = new MenuItem(text);
     menuItem.setOnAction(event -> dialog.showAndWait().ifPresent(result
         -> resultConsumer.accept(NetworkTableUtilities
-          .concat(key, result.getKey()), result.getValue())));
+        .concat(key, result.getKey()), result.getValue())));
     return menuItem;
   }
 

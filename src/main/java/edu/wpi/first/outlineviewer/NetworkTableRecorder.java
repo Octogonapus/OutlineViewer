@@ -276,7 +276,7 @@ public class NetworkTableRecorder extends Thread {
   public void load(File file, Window window) {
     player.loadRecording(file, window);
     pause(); //Pause recording
-    player.skipToTime(6998844338L);
+    player.startPlayback();
   }
 
   /**
