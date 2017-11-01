@@ -27,6 +27,7 @@ import java.util.List;
 import java.util.function.BiConsumer;
 import javafx.beans.property.ReadOnlyStringWrapper;
 import javafx.fxml.FXML;
+import javafx.scene.Node;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
 import javafx.scene.control.ButtonType;
@@ -48,6 +49,7 @@ import javafx.stage.FileChooser;
 import javafx.stage.Modality;
 import javafx.stage.StageStyle;
 import org.controlsfx.glyphfont.FontAwesome;
+import org.controlsfx.glyphfont.Glyph;
 
 /**
  * Controller for the main window.
@@ -76,6 +78,9 @@ public class MainWindowController {
   @FXML
   private Slider replaySlider;
   private NetworkTableRecorder ntRecorder;
+
+  private static final Glyph FONTAWESOME_PLAY = new FontAwesome().create(FontAwesome.Glyph.PLAY);
+  private static final Glyph FONTAWESOME_PAUSE = new FontAwesome().create(FontAwesome.Glyph.PAUSE);
 
   @FXML
   @SuppressWarnings("PMD.AccessorMethodGeneration")
@@ -368,11 +373,19 @@ public class MainWindowController {
 
   @FXML
   private void playPauseNTRecord() {
-    playPauseButton.setGraphic(new FontAwesome().create(FontAwesome.Glyph.PAUSE));
+    if (ntRecorder.getPlaybackIsPaused().get()) {
+      ntRecorder.unpausePlayback();
+      playPauseButton.setGraphic(FONTAWESOME_PLAY);
+    } else {
+      ntRecorder.pausePlayback();
+      playPauseButton.setGraphic(FONTAWESOME_PAUSE);
+    }
   }
 
   @FXML
   private void rewindNTRecord() {
+    //Rewind glyph is set in the FXML file
+    ntRecorder.rewindPlayback();
   }
 
   @FXML
