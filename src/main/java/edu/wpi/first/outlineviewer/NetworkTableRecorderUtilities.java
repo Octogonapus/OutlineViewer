@@ -197,20 +197,22 @@ public final class NetworkTableRecorderUtilities {
    * Computes the NetworkTable state at a given time by running through the loaded recording and
    * simulating publishing those data.
    *
+   * @param record Record to scrub inside of
    * @param time Time in recording
+   * @return State of the NetworkTable
    */
-  public static Map<String, String> computeNetworkTableState(NetworkTableRecord record, long time) {
-    Map<String, String> state = new HashMap<>();
+  public static Map<String, EntryChange> computeNetworkTableState(NetworkTableRecord record, long time) {
+    Map<String, EntryChange> state = new HashMap<>();
     record.keySet()
         .parallelStream()
         .sorted()
         .forEachOrdered(val -> {
-          if (val < time) {
-            EntryChange change = record.get(time);
+          if (val <= time) {
+            EntryChange change = record.get(val);
             if (change.getNewValue().equals("[[DELETED]]")) {
               state.remove(change.getName());
             } else {
-              state.put(change.getName(), change.getNewValue());
+              state.put(change.getName(), change);
             }
           }
         });

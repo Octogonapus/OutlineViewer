@@ -1,6 +1,7 @@
 package edu.wpi.first.outlineviewer;
 
 import com.google.common.base.Stopwatch;
+import edu.wpi.first.networktables.NetworkTable;
 import edu.wpi.first.networktables.NetworkTableEntry;
 import edu.wpi.first.networktables.NetworkTableType;
 import edu.wpi.first.outlineviewer.model.EntryChange;
@@ -11,6 +12,7 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
@@ -146,11 +148,17 @@ public class NetworkTablePlayer {
     }
   }
 
+  public void startPlayback() {
+    startPlayback(0);
+  }
+
   /**
    * Start the playback of the loaded recording. If no recording has been loaded, or the loaded
    * recording empty, this won't play anything.
+   *
+   * @param startTime Starting time to play from
    */
-  public void startPlayback() {
+  public void startPlayback(long startTime) {
     //Don't play an empty recording
     if (playback.size() == 0) {
       return;
@@ -158,12 +166,13 @@ public class NetworkTablePlayer {
 
     playbackDone.get().set(false);
 
-    playbackThread = new Thread(() -> {
-      List<Long> times = playback.keySet()
-          .parallelStream()
-          .sorted()
-          .collect(Collectors.toList());
+    List<Long> times = playback.keySet()
+        .parallelStream()
+        .filter(time -> time >= startTime) //If we aren't starting at 0, we need to drop the past
+        .sorted()
+        .collect(Collectors.toList());
 
+    playbackThread = new Thread(() -> {
       //StopWatch to control publishing timings
       Stopwatch stopwatch = Stopwatch.createStarted();
       //final long endTime = playbackEndTime.get();
@@ -171,7 +180,8 @@ public class NetworkTablePlayer {
 
       times.forEach(time -> {
         //Wait until we should publish the new value
-        while (stopwatch.elapsed(TimeUnit.NANOSECONDS) < time) {
+        //startTime is used as an offset in case we are not starting at 0
+        while (stopwatch.elapsed(TimeUnit.NANOSECONDS) + startTime < time) {
           playbackPercentage.get().set(stopwatch.elapsed(TimeUnit.NANOSECONDS) / (double) lastTime);
 
           //Pause the stopwatch when playback is paused
@@ -194,75 +204,7 @@ public class NetworkTablePlayer {
             = NetworkTableUtilities.getNetworkTableInstance().getEntry(change.getName());
 
         //Set the value of the change
-        switch (change.getType()) {
-          case kDouble:
-            if (change.getNewValue().equals("[[DELETED]]")) {
-              entry.delete();
-            } else {
-              entry.setDouble(Double.parseDouble(change.getNewValue()));
-            }
-            break;
-
-          case kString:
-            if (change.getNewValue().equals("[[DELETED]]")) {
-              entry.delete();
-            } else {
-              entry.setString(change.getNewValue());
-            }
-            break;
-
-          case kBoolean:
-            if (change.getNewValue().equals("[[DELETED]]")) {
-              entry.delete();
-            } else {
-              entry.setBoolean(Boolean.parseBoolean(change.getNewValue()));
-            }
-            break;
-
-          case kDoubleArray:
-            if (change.getNewValue().equals("[[DELETED]]")) {
-              entry.delete();
-            } else {
-              entry.setDoubleArray(
-                  NetworkTableRecorderUtilities.parseDoubleArray(change.getNewValue()));
-            }
-            break;
-
-          case kStringArray:
-            if (change.getNewValue().equals("[[DELETED]]")) {
-              entry.delete();
-            } else {
-              entry.setStringArray(
-                  NetworkTableRecorderUtilities.parseStringArray(change.getNewValue()));
-            }
-            break;
-
-          case kBooleanArray:
-            if (change.getNewValue().equals("[[DELETED]]")) {
-              entry.delete();
-            } else {
-              entry.setBooleanArray(
-                  NetworkTableRecorderUtilities.parseBooleanArray(change.getNewValue()));
-            }
-            break;
-
-          case kRaw:
-            if (change.getNewValue().equals("[[DELETED]]")) {
-              entry.delete();
-            } else {
-              entry.setRaw(NetworkTableRecorderUtilities.parseByteArray(change.getNewValue()));
-            }
-            break;
-
-          case kUnassigned:
-            if (change.getNewValue().equals("[[DELETED]]")) {
-              entry.delete();
-            }
-            break;
-
-          default:
-            break;
-        }
+        setEntryValue(change, entry);
       });
 
       playbackDone.get().set(true);
@@ -271,6 +213,78 @@ public class NetworkTablePlayer {
     //Playback should not prevent closing
     playbackThread.setDaemon(true);
     playbackThread.start();
+  }
+
+  private void setEntryValue(EntryChange change, NetworkTableEntry entry) {
+    switch (change.getType()) {
+      case kDouble:
+        if (change.getNewValue().equals("[[DELETED]]")) {
+          entry.delete();
+        } else {
+          entry.setDouble(Double.parseDouble(change.getNewValue()));
+        }
+        break;
+
+      case kString:
+        if (change.getNewValue().equals("[[DELETED]]")) {
+          entry.delete();
+        } else {
+          entry.setString(change.getNewValue());
+        }
+        break;
+
+      case kBoolean:
+        if (change.getNewValue().equals("[[DELETED]]")) {
+          entry.delete();
+        } else {
+          entry.setBoolean(Boolean.parseBoolean(change.getNewValue()));
+        }
+        break;
+
+      case kDoubleArray:
+        if (change.getNewValue().equals("[[DELETED]]")) {
+          entry.delete();
+        } else {
+          entry.setDoubleArray(
+              NetworkTableRecorderUtilities.parseDoubleArray(change.getNewValue()));
+        }
+        break;
+
+      case kStringArray:
+        if (change.getNewValue().equals("[[DELETED]]")) {
+          entry.delete();
+        } else {
+          entry.setStringArray(
+              NetworkTableRecorderUtilities.parseStringArray(change.getNewValue()));
+        }
+        break;
+
+      case kBooleanArray:
+        if (change.getNewValue().equals("[[DELETED]]")) {
+          entry.delete();
+        } else {
+          entry.setBooleanArray(
+              NetworkTableRecorderUtilities.parseBooleanArray(change.getNewValue()));
+        }
+        break;
+
+      case kRaw:
+        if (change.getNewValue().equals("[[DELETED]]")) {
+          entry.delete();
+        } else {
+          entry.setRaw(NetworkTableRecorderUtilities.parseByteArray(change.getNewValue()));
+        }
+        break;
+
+      case kUnassigned:
+        if (change.getNewValue().equals("[[DELETED]]")) {
+          entry.delete();
+        }
+        break;
+
+      default:
+        break;
+    }
   }
 
   public void pause() {
@@ -290,6 +304,21 @@ public class NetworkTablePlayer {
           .forEach(NetworkTableEntry::delete);
       startPlayback();
     }
+  }
+
+  public void skipToTime(long time) {
+    if (playbackThread != null) { //Null thread means we haven't started playback yet
+      playbackThread.interrupt(); //Stop the playback thread
+    }
+    Arrays.stream(NetworkTableUtilities
+        .getNetworkTableInstance()
+        .getEntries("", 0xFF))
+        .forEach(NetworkTableEntry::delete);
+    Map<String, EntryChange> state = NetworkTableRecorderUtilities
+        .computeNetworkTableState(playback, time);
+    state.forEach((key, val) ->
+        setEntryValue(val, NetworkTableUtilities.getNetworkTableInstance().getEntry(key)));
+    startPlayback(time);
   }
 
   public boolean isDone() {
