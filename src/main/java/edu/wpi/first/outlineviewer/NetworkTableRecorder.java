@@ -54,6 +54,7 @@ public class NetworkTableRecorder extends Thread {
   }
 
   @Override
+  @SuppressWarnings("PMD.AvoidSynchronizedAtMethodLevel")
   public synchronized void start() {
     try {
       super.start();

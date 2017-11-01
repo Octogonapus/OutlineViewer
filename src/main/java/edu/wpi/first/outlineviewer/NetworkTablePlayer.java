@@ -30,16 +30,14 @@ import javafx.stage.Modality;
 import javafx.stage.Window;
 import org.apache.commons.text.StringEscapeUtils;
 
+@SuppressWarnings("PMD.GodClass")
 public class NetworkTablePlayer {
   private final NetworkTableRecord playback;
   private Thread playbackThread;
-  private AtomicReference<BooleanProperty> playbackIsPaused;
-  private AtomicReference<DoubleProperty> playbackPercentage;
-  private AtomicLong playbackEndTime;
-  private AtomicReference<BooleanProperty> playbackDone;
-
-  private File file;
-  private Window window;
+  private final  AtomicReference<BooleanProperty> playbackIsPaused;
+  private final  AtomicReference<DoubleProperty> playbackPercentage;
+  private final  AtomicLong playbackEndTime;
+  private final  AtomicReference<BooleanProperty> playbackDone;
 
   public NetworkTablePlayer() {
     playback = new NetworkTableRecord();
@@ -48,9 +46,6 @@ public class NetworkTablePlayer {
     playbackPercentage = new AtomicReference<>(new SimpleDoubleProperty(0));
     playbackEndTime = new AtomicLong(0);
     playbackDone = new AtomicReference<>(new SimpleBooleanProperty(true));
-
-    file = null;
-    window = null;
   }
 
   /**
@@ -61,9 +56,6 @@ public class NetworkTablePlayer {
    */
   @SuppressWarnings("checkstyle:VariableDeclarationUsageDistance")
   public void loadRecording(File file, Window window) {
-    this.file = file;
-    this.window = window;
-
     //ProgressIndicator for loading a recording
     ProgressIndicator progressIndicator = new ProgressIndicator();
     Dialog<String> dialog = new Dialog<>();
@@ -175,7 +167,7 @@ public class NetworkTablePlayer {
     times.add(lastTime);
 
     //Don't play an empty section
-    if (times.size() == 0) {
+    if (times.isEmpty()) {
       playbackDone.get().set(true);
       return;
     }
@@ -189,9 +181,9 @@ public class NetworkTablePlayer {
       for (Long time : times) {
         //Wait until we should publish the new value
         //startTime is used as an offset in case we are not starting at 0
-        while (stopwatch.elapsed(TimeUnit.NANOSECONDS) + startTime < time) {
-          playbackPercentage.get()
-              .set((stopwatch.elapsed(TimeUnit.NANOSECONDS) + startTime) / (double) lastTime);
+        long elapsed = stopwatch.elapsed(TimeUnit.NANOSECONDS) + startTime;
+        while (elapsed < time) {
+          playbackPercentage.get().set(elapsed / (double) lastTime);
 
           //Pause the stopwatch when playback is paused
           if (playbackIsPaused.get().get() && stopwatch.isRunning()) {
@@ -206,6 +198,8 @@ public class NetworkTablePlayer {
             Thread.currentThread().interrupt(); //Rethrow to interrupt again
             break; //Break out of for-each loop
           }
+
+          elapsed = stopwatch.elapsed(TimeUnit.NANOSECONDS) + startTime;
         }
 
         //Get the change
@@ -307,6 +301,9 @@ public class NetworkTablePlayer {
     playbackIsPaused.get().set(false);
   }
 
+  /**
+   * Rewind the playback to the start and play again.
+   */
   public void rewind() {
     if (playbackThread != null) { //Null thread means we haven't started playback yet
       playbackThread.interrupt(); //Stop the playback thread
@@ -318,6 +315,10 @@ public class NetworkTablePlayer {
     }
   }
 
+  /**
+   * Skip to a specific time in the replay and start playing from there.
+   * @param time Time in the replay to skip to
+   */
   public void skipToTime(long time) {
     if (playbackThread != null) { //Null thread means we haven't started playback yet
       playbackThread.interrupt(); //Stop the playback thread

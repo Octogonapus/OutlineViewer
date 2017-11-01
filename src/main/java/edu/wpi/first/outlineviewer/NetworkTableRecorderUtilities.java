@@ -14,6 +14,9 @@ import org.apache.commons.lang3.ArrayUtils;
 
 public final class NetworkTableRecorderUtilities {
 
+  private NetworkTableRecorderUtilities() { //Utility class
+  }
+
   /**
    * Returns a NetworkTableEntry's value as a string.
    *
@@ -77,11 +80,11 @@ public final class NetworkTableRecorderUtilities {
 
     for (int i = 0; i < source.length(); ) {
       String sub = findSubstring(source, i, ',', false);
-      if (!sub.equals("")) {
+      if ("".equals(sub)) {
+        i++;
+      } else {
         doubles.add(Double.parseDouble(sub));
         i += sub.length() + 1;
-      } else {
-        i++;
       }
     }
 
@@ -99,11 +102,11 @@ public final class NetworkTableRecorderUtilities {
 
     for (int i = 0; i < source.length(); ) {
       String sub = findSubstring(source, i, ',', false);
-      if (!sub.equals("")) {
+      if ("".equals(sub)) {
+        i++;
+      } else {
         strings.add(sub);
         i += sub.length() + 1;
-      } else {
-        i++;
       }
     }
 
@@ -127,11 +130,11 @@ public final class NetworkTableRecorderUtilities {
         val = "true";
       }
 
-      if (!sub.equals("")) {
+      if ("".equals(sub)) {
+        i++;
+      } else {
         booleans.add(Boolean.parseBoolean(val));
         i += sub.length() + 1;
-      } else {
-        i++;
       }
     }
 
@@ -149,11 +152,11 @@ public final class NetworkTableRecorderUtilities {
 
     for (int i = 0; i < source.length(); ) {
       String sub = findSubstring(source, i, ',', false);
-      if (!sub.equals("")) {
+      if ("".equals(sub)) {
+        i++;
+      } else {
         bytes.add(Byte.parseByte(sub));
         i += sub.length() + 1;
-      } else {
-        i++;
       }
     }
 
@@ -201,7 +204,8 @@ public final class NetworkTableRecorderUtilities {
    * @param time Time in recording
    * @return State of the NetworkTable
    */
-  public static Map<String, EntryChange> computeNetworkTableState(NetworkTableRecord record, long time) {
+  public static Map<String, EntryChange> computeNetworkTableState(NetworkTableRecord record,
+                                                                  long time) {
     Map<String, EntryChange> state = new HashMap<>();
     record.keySet()
         .parallelStream()

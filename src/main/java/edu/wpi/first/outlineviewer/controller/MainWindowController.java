@@ -56,6 +56,7 @@ import org.controlsfx.glyphfont.Glyph;
 /**
  * Controller for the main window.
  */
+@SuppressWarnings("PMD.GodClass")
 public class MainWindowController {
 
   @FXML
@@ -222,20 +223,18 @@ public class MainWindowController {
     replaySlider.setMax(1);
     replaySlider.setDisable(true);
 
-    ntRecorder.playbackPercentageProperty().get().addListener(((observable, oldValue, newValue) -> {
+    ntRecorder.playbackPercentageProperty().get().addListener((observable, oldValue, newValue) -> {
       if (!ntRecorder.playbackIsPaused()) {
         Platform.runLater(() -> replaySlider.setValue(newValue.doubleValue()));
       }
-    }));
+    });
 
-    replaySlider.valueChangingProperty().addListener(((observable, oldValue, newValue) -> {
-      if (ntRecorder.playbackIsPaused()) {
-        if (!newValue && oldValue) {
-          enablePlayback();
-          ntRecorder.setReplayPercentage(replaySlider.getValue());
-        }
+    replaySlider.valueChangingProperty().addListener((observable, oldValue, newValue) -> {
+      if (ntRecorder.playbackIsPaused() && !newValue && oldValue) {
+        enablePlayback();
+        ntRecorder.setReplayPercentage(replaySlider.getValue());
       }
-    }));
+    });
   }
 
   /**
@@ -371,7 +370,7 @@ public class MainWindowController {
     try {
       ntRecorder.saveAndJoin(root.getScene().getWindow());
     } catch (IOException | InterruptedException e) {
-      e.printStackTrace();
+      //TODO: Log this
     }
   }
 
