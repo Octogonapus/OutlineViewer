@@ -16,9 +16,11 @@ import com.google.common.base.Stopwatch;
 import com.google.common.io.Files;
 import edu.wpi.first.networktables.NetworkTableEntry;
 import edu.wpi.first.networktables.NetworkTableType;
+import edu.wpi.first.networktables.NetworkTableValue;
 import edu.wpi.first.outlineviewer.model.EntryChange;
 import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
@@ -27,7 +29,9 @@ import java.nio.file.Paths;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.StringJoiner;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
@@ -252,6 +256,7 @@ public class NetworkTableRecorder extends Thread {
                     + StringEscapeUtils.escapeXSI(values.get(key).getNewValue())
                     + "\n");
               } catch (IOException ignored) {
+                //TODO: Log this
               }
             });
 
@@ -356,7 +361,7 @@ public class NetworkTableRecorder extends Thread {
     try {
       latch.await();
     } catch (InterruptedException e) {
-      e.printStackTrace();
+      //TODO: This should be ignored, and we should just move onto playing the recording
     }
 
     pause();
@@ -380,7 +385,7 @@ public class NetworkTableRecorder extends Thread {
       times.forEach(time -> {
         //Wait until we should publish the new value
         while (stopwatch.elapsed(TimeUnit.NANOSECONDS) < time) {
-          playbackPercentage.set((double)stopwatch.elapsed(TimeUnit.NANOSECONDS) / (double)lastTime);
+          playbackPercentage.set(stopwatch.elapsed(TimeUnit.NANOSECONDS) / (double) lastTime);
 
           if (playbackShouldPause.get()) {
             stopwatch.stop();
@@ -396,8 +401,8 @@ public class NetworkTableRecorder extends Thread {
         }
 
         EntryChange change = playback.get(time);
-        NetworkTableEntry entry = NetworkTableUtilities.getNetworkTableInstance()
-            .getEntry(change.getName());
+        NetworkTableEntry entry
+            = NetworkTableUtilities.getNetworkTableInstance().getEntry(change.getName());
 
         switch (change.getType()) {
           case kDouble:
@@ -460,14 +465,41 @@ public class NetworkTableRecorder extends Thread {
             if (change.getNewValue().equals("[[DELETED]]")) {
               entry.delete();
             }
+            break;
 
           default:
             break;
         }
       });
+
+      computeNetworkTableState(times.get(times.size() - 1));
     });
     playbackThread.setDaemon(true);
     playbackThread.start();
+  }
+
+  /**
+   * Computes the NetworkTable state at a given time by running through the loaded recording and
+   * simulating publishing those values.
+   *
+   * @param time Time in recording
+   */
+  private Map<String, String> computeNetworkTableState(long time) {
+    Map<String, String> state = new HashMap<>();
+    playback.keySet()
+        .parallelStream()
+        .sorted()
+        .forEachOrdered(val -> {
+          if (val < time) {
+            EntryChange change = playback.get(time);
+            if (change.getNewValue().equals("[[DELETED]]")) {
+              state.remove(change.getName());
+            } else {
+              state.put(change.getName(), change.getNewValue());
+            }
+          }
+        });
+    return state;
   }
 
   /**
@@ -520,18 +552,15 @@ public class NetworkTableRecorder extends Thread {
    * @param source boolean array String
    * @return boolean array version of string
    */
-  private boolean[] parseBooleanArray(String source) {
+  private boolean[] parseBooleanArray(String source) throws NumberFormatException {
     List<Boolean> booleans = new ArrayList<>();
 
     for (int i = 0; i < source.length(); ) {
       String sub = findSubstring(source, i, ',', false);
       String val = sub;
 
-      try {
-        if (Integer.parseInt(sub) == 1) {
-          val = "true";
-        }
-      } catch (NumberFormatException ignored) {
+      if (Integer.parseInt(sub) == 1) {
+        val = "true";
       }
 
       if (!sub.equals("")) {

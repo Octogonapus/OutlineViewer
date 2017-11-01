@@ -361,6 +361,7 @@ public class MainWindowController {
       try {
         ntRecorder.load(selected, root.getScene().getWindow());
       } catch (IOException ignored) {
+        //TODO: Log this
       }
     }
   }
