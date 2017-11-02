@@ -15,6 +15,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.logging.Level;
 import java.util.stream.Collectors;
 import javafx.application.Platform;
 import javafx.beans.property.BooleanProperty;
@@ -34,10 +35,10 @@ import org.apache.commons.text.StringEscapeUtils;
 public class NetworkTablePlayer {
   private final NetworkTableRecord playback;
   private Thread playbackThread;
-  private final  AtomicReference<BooleanProperty> playbackIsPaused;
-  private final  AtomicReference<DoubleProperty> playbackPercentage;
-  private final  AtomicLong playbackEndTime;
-  private final  AtomicReference<BooleanProperty> playbackDone;
+  private final AtomicReference<BooleanProperty> playbackIsPaused;
+  private final AtomicReference<DoubleProperty> playbackPercentage;
+  private final AtomicLong playbackEndTime;
+  private final AtomicReference<BooleanProperty> playbackDone;
 
   public NetworkTablePlayer() {
     playback = new NetworkTableRecord();
@@ -120,7 +121,8 @@ public class NetworkTablePlayer {
                   value));
         }
       } catch (IOException e) {
-        //TODO: Log this
+        LoggerUtilities.getLogger().log(Level.SEVERE, "Unable to load recording with path: "
+            + file.getAbsolutePath());
       } finally {
         Platform.runLater(() -> {
           dialog.getDialogPane().getButtonTypes().add(ButtonType.CANCEL);
@@ -133,8 +135,9 @@ public class NetworkTablePlayer {
     //Wait for loading to finish
     try {
       latch.await();
-    } catch (InterruptedException e) {
-      //TODO: This should be ignored, and we should just move onto playing the recording
+      //CHECKSTYLE.OFF: EmptyCatchBlock
+    } catch (InterruptedException ignored) {
+      //CHECKSTYLE.ON: EmptyCatchBlock
     }
   }
 
@@ -317,6 +320,7 @@ public class NetworkTablePlayer {
 
   /**
    * Skip to a specific time in the replay and start playing from there.
+   *
    * @param time Time in the replay to skip to
    */
   public void skipToTime(long time) {

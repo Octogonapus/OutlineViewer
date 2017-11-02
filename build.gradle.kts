@@ -5,6 +5,7 @@ import org.gradle.api.plugins.quality.FindBugs
 import org.gradle.api.tasks.wrapper.Wrapper
 import org.gradle.testing.jacoco.tasks.JacocoReport
 import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
+import org.gradle.internal.impldep.org.junit.experimental.categories.Categories.CategoryFilter.exclude
 
 buildscript {
     repositories {
@@ -67,6 +68,7 @@ dependencies {
     compile(group = "org.controlsfx", name = "controlsfx", version = "8.40.14")
     compile(group = "com.google.guava", name = "guava", version = "23.0")
     compile(group = "org.apache.commons", name = "commons-text", version = "1.1")
+    compile(group = "commons-io", name = "commons-io", version = "2.6")
 
     runtime(group = "edu.wpi.first.ntcore", name = "ntcore-jni", version = "4.+", classifier = "all")
 

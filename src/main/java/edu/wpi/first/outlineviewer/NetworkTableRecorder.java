@@ -16,6 +16,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.LocalDateTime;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.logging.Level;
 import javafx.application.Platform;
 import javafx.beans.property.DoubleProperty;
 import javafx.beans.property.SimpleObjectProperty;
@@ -54,12 +55,13 @@ public class NetworkTableRecorder extends Thread {
   }
 
   @Override
-  @SuppressWarnings("PMD.AvoidSynchronizedAtMethodLevel")
+  @SuppressWarnings({"PMD.AvoidSynchronizedAtMethodLevel", "PMD.EmptyCatchBlock"})
   public synchronized void start() {
     try {
       super.start();
+      //CHECKSTYLE.OFF: EmptyCatchBlock
     } catch (IllegalThreadStateException ignored) {
-      //TODO: Suppress checkstyle?
+      //CHECKSTYLE.ON: EmptyCatchBlock
     }
   }
 
@@ -194,7 +196,11 @@ public class NetworkTableRecorder extends Thread {
       try {
         sleep(1);
       } catch (InterruptedException e) {
-        e.printStackTrace();
+        LoggerUtilities.getLogger()
+            .log(Level.WARNING,
+                "Interrupted while waiting for main thread to finish for some reason: "
+                    + e.getMessage());
+        Thread.currentThread().interrupt();
       }
     }
 
@@ -235,17 +241,26 @@ public class NetworkTableRecorder extends Thread {
               .sorted()
               .forEachOrdered(key -> {
                 try {
+                  EntryChange change = recording.get(key);
                   writer.write(StringEscapeUtils.escapeXSI(key.toString())
                       + ";"
-                      + StringEscapeUtils.escapeXSI(recording.get(key).getName())
+                      + StringEscapeUtils.escapeXSI(change.getName())
                       + ";"
                       + StringEscapeUtils.escapeXSI(
-                      String.valueOf(recording.get(key).getTypeValue()))
+                      String.valueOf(change.getTypeValue()))
                       + ";"
-                      + StringEscapeUtils.escapeXSI(recording.get(key).getNewValue())
+                      + StringEscapeUtils.escapeXSI(change.getNewValue())
                       + "\n");
                 } catch (IOException e) {
-                  //TODO: Log this
+                  EntryChange change = recording.get(key);
+                  LoggerUtilities.getLogger().log(Level.SEVERE, "Unable to save entry: "
+                      + key
+                      + ";"
+                      + change.getName()
+                      + ";"
+                      + change.getTypeValue()
+                      + ";"
+                      + change.getNewValue());
                 }
               });
 
@@ -255,7 +270,7 @@ public class NetworkTableRecorder extends Thread {
           writer.flush();
           writer.close();
         } catch (IOException e) {
-          //TODO: Log this
+          LoggerUtilities.getLogger().log(Level.SEVERE, "Unable to create recording save file");
         }
       } finally {
         //In order to close the dialog, we cheekily add a Button before the user notices and then
@@ -359,6 +374,7 @@ public class NetworkTableRecorder extends Thread {
 
   /**
    * Compute the time since the start of the recording.
+   *
    * @return The time recording started
    */
   private long timeSinceStart() {

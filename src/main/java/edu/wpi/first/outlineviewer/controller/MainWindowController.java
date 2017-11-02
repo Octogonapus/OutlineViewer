@@ -4,6 +4,7 @@ import com.google.common.primitives.Bytes;
 import edu.wpi.first.networktables.NetworkTableEntry;
 import edu.wpi.first.networktables.NetworkTableValue;
 import edu.wpi.first.networktables.PersistentException;
+import edu.wpi.first.outlineviewer.LoggerUtilities;
 import edu.wpi.first.outlineviewer.NetworkTableRecorder;
 import edu.wpi.first.outlineviewer.NetworkTableUtilities;
 import edu.wpi.first.outlineviewer.model.NetworkTableTreeRow;
@@ -25,6 +26,7 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
 import java.util.function.BiConsumer;
+import java.util.logging.Level;
 import java.util.stream.Collectors;
 import javafx.application.Platform;
 import javafx.beans.property.ReadOnlyStringWrapper;
@@ -335,6 +337,7 @@ public class MainWindowController {
         String nameString = file.getAbsolutePath();
         NetworkTableUtilities.getNetworkTableInstance().loadEntries(nameString, "");
       } catch (PersistentException e) {
+        LoggerUtilities.getLogger().log(Level.SEVERE, "Unable to load saved entries");
         Alert alert = new Alert(Alert.AlertType.ERROR);
         alert.setTitle("NetworkTables error");
         alert.setHeaderText("Unable to load saved entries");
@@ -354,6 +357,7 @@ public class MainWindowController {
       try {
         NetworkTableUtilities.getNetworkTableInstance().saveEntries(saveFile.getAbsolutePath(), "");
       } catch (PersistentException e) {
+        LoggerUtilities.getLogger().log(Level.SEVERE, "Unable to save NetworkTables state");
         Alert alert = new Alert(Alert.AlertType.ERROR);
         alert.setTitle("NetworkTables error");
         alert.setContentText(e.getMessage());
@@ -372,7 +376,7 @@ public class MainWindowController {
     try {
       ntRecorder.saveAndJoin(root.getScene().getWindow());
     } catch (IOException | InterruptedException e) {
-      //TODO: Log this
+      LoggerUtilities.getLogger().log(Level.SEVERE, "Unable to save NetworkTables recording");
     }
   }
 
