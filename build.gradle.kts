@@ -151,8 +151,8 @@ afterEvaluate {
 }
 
 /*
-     * Allows you to run the UI tests in headless mode by calling gradle with the -Pheadless argument
-     */
+ * Allows you to run the UI tests in headless mode by calling gradle with the -Pheadless argument
+ */
 if (project.hasProperty("jenkinsBuild") || project.hasProperty("headless")) {
     println("Running UI Tests Headless")
     junitPlatform {

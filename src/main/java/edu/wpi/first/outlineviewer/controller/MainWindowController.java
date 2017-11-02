@@ -209,10 +209,13 @@ public class MainWindowController {
           }
         });
 
+        MenuItem graph = new MenuItem("Graph Value");
+        graph.setOnAction(event -> ntRecorder.displayGraph(entry.getKey()));
+
         MenuItem delete = new MenuItem("Delete");
         delete.setOnAction(event -> deleteSelectedEntries());
 
-        cm.getItems().addAll(setPersistent, delete);
+        cm.getItems().addAll(setPersistent, graph, delete);
       }
 
       tableView.setContextMenu(cm);
@@ -296,7 +299,8 @@ public class MainWindowController {
         new SeparatorMenuItem(),
         stringArray, numberArray, boolArray,
         new SeparatorMenuItem(),
-        raw);
+        raw
+        );
   }
 
   /**

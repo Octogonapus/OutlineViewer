@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.chart.LineChart?>
+<?import javafx.scene.chart.NumberAxis?>
+<?import javafx.scene.control.TextField?>
+<?import javafx.scene.layout.AnchorPane?>
+<?import javafx.scene.layout.VBox?>
+
+<AnchorPane prefHeight="400.0" prefWidth="600.0" xmlns="http://javafx.com/javafx/8.0.111" xmlns:fx="http://javafx.com/fxml/1" fx:controller="edu.wpi.first.outlineviewer.controller.NetworkTableGraphController">
+   <VBox alignment="CENTER" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
+      <children>
+          <LineChart fx:id="lineChart" title="Graph">
+              <xAxis>
+                  <NumberAxis side="BOTTOM" fx:id="xAxis" />
+              </xAxis>
+              <yAxis>
+                  <NumberAxis fx:id="yAxis" side="LEFT" />
+              </yAxis>
+          </LineChart>
+         <TextField fx:id="textFieldGraphViewWidth" maxWidth="100.0">
+            <VBox.margin>
+               <Insets bottom="10.0" />
+            </VBox.margin>
+         </TextField>
+      </children>
+   </VBox>
+</AnchorPane>
