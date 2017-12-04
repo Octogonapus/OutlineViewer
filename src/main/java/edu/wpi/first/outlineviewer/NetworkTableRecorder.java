@@ -7,7 +7,6 @@ import static edu.wpi.first.networktables.EntryListenerFlags.kUpdate;
 import com.google.common.io.Files;
 import edu.wpi.first.networktables.NetworkTableEntry;
 import edu.wpi.first.networktables.NetworkTableType;
-import edu.wpi.first.outlineviewer.controller.NetworkTableGraphController;
 import edu.wpi.first.outlineviewer.model.EntryChange;
 import edu.wpi.first.outlineviewer.model.NetworkTableRecord;
 import java.io.File;
@@ -21,18 +20,13 @@ import java.util.logging.Level;
 import javafx.application.Platform;
 import javafx.beans.property.DoubleProperty;
 import javafx.beans.property.SimpleObjectProperty;
-import javafx.fxml.FXMLLoader;
 import javafx.geometry.Pos;
-import javafx.scene.Scene;
 import javafx.scene.control.ButtonType;
 import javafx.scene.control.Dialog;
 import javafx.scene.control.ProgressIndicator;
-import javafx.scene.layout.Pane;
 import javafx.scene.layout.StackPane;
 import javafx.stage.FileChooser;
 import javafx.stage.Modality;
-import javafx.stage.Stage;
-import javafx.stage.StageStyle;
 import javafx.stage.Window;
 import org.apache.commons.text.StringEscapeUtils;
 
@@ -287,22 +281,6 @@ public class NetworkTableRecorder extends Thread {
         });
       }
     }).start();
-  }
-
-  public void displayGraph(String key) {
-    Stage stage = new Stage();
-    stage.initStyle(StageStyle.DECORATED);
-    stage.setAlwaysOnTop(true);
-    FXMLLoader loader = new FXMLLoader(getClass().getResource("view/ntGraph.fxml"));
-    try {
-      Pane pane = loader.load();
-      NetworkTableGraphController controller = loader.getController();
-      controller.graphEntry(key);
-      stage.setScene(new Scene(pane));
-      stage.show();
-    } catch (IOException e) {
-      e.printStackTrace();
-    }
   }
 
   /**
