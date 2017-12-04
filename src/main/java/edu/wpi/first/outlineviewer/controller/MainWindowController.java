@@ -5,7 +5,6 @@ import edu.wpi.first.networktables.NetworkTableEntry;
 import edu.wpi.first.networktables.NetworkTableValue;
 import edu.wpi.first.networktables.PersistentException;
 import edu.wpi.first.outlineviewer.LoggerUtilities;
-import edu.wpi.first.outlineviewer.NetworkTableRecorder;
 import edu.wpi.first.outlineviewer.NetworkTableUtilities;
 import edu.wpi.first.outlineviewer.model.NetworkTableTreeRow;
 import edu.wpi.first.outlineviewer.model.TreeEntry;
@@ -28,17 +27,16 @@ import java.util.List;
 import java.util.function.BiConsumer;
 import java.util.logging.Level;
 import java.util.stream.Collectors;
-import javafx.application.Platform;
 import javafx.beans.property.ReadOnlyStringWrapper;
 import javafx.fxml.FXML;
+import javafx.fxml.FXMLLoader;
+import javafx.scene.Scene;
 import javafx.scene.control.Alert;
-import javafx.scene.control.Button;
 import javafx.scene.control.ButtonType;
 import javafx.scene.control.ContextMenu;
 import javafx.scene.control.MenuItem;
 import javafx.scene.control.SelectionMode;
 import javafx.scene.control.SeparatorMenuItem;
-import javafx.scene.control.Slider;
 import javafx.scene.control.TreeItem;
 import javafx.scene.control.TreeTableColumn;
 import javafx.scene.control.TreeTableRow;
@@ -46,14 +44,11 @@ import javafx.scene.control.TreeTableView;
 import javafx.scene.control.cell.TreeItemPropertyValueFactory;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.MouseEvent;
-import javafx.scene.layout.HBox;
 import javafx.scene.layout.Pane;
-import javafx.scene.layout.Priority;
 import javafx.stage.FileChooser;
 import javafx.stage.Modality;
+import javafx.stage.Stage;
 import javafx.stage.StageStyle;
-import org.controlsfx.glyphfont.FontAwesome;
-import org.controlsfx.glyphfont.Glyph;
 
 /**
  * Controller for the main window.
@@ -75,19 +70,6 @@ public class MainWindowController {
   private TreeTableColumn<TreeRow, Object> valueColumn;
   @FXML
   private TreeTableColumn<TreeRow, String> typeColumn;
-
-  @FXML
-  private HBox playerHBox;
-  @FXML
-  private Button playPauseButton;
-  @FXML
-  private Button rewindNTRecordButton;
-  @FXML
-  private Slider replaySlider;
-  private NetworkTableRecorder ntRecorder;
-
-  private static final Glyph FONTAWESOME_PLAY = new FontAwesome().create(FontAwesome.Glyph.PLAY);
-  private static final Glyph FONTAWESOME_PAUSE = new FontAwesome().create(FontAwesome.Glyph.PAUSE);
 
   @FXML
   @SuppressWarnings("PMD.AccessorMethodGeneration")
@@ -210,7 +192,7 @@ public class MainWindowController {
         });
 
         MenuItem graph = new MenuItem("Graph Value");
-        graph.setOnAction(event -> ntRecorder.displayGraph(entry.getKey()));
+        graph.setOnAction(event -> displayGraph(entry.getKey()));
 
         MenuItem delete = new MenuItem("Delete");
         delete.setOnAction(event -> deleteSelectedEntries());
@@ -221,27 +203,23 @@ public class MainWindowController {
       tableView.setContextMenu(cm);
       cm.show(tableView, contextMenuEvent.getScreenX(), contextMenuEvent.getScreenY());
     });
+  }
 
-    ntRecorder = new NetworkTableRecorder();
-    HBox.setHgrow(playerHBox, Priority.ALWAYS);
-    replaySlider.setMin(0);
-    replaySlider.setMax(1);
-    replaySlider.setDisable(true);
-
-    //Update the slider position as the recording plays
-    ntRecorder.playbackPercentageProperty().get().addListener((observable, oldValue, newValue) -> {
-      if (!ntRecorder.playbackIsPaused()) {
-        Platform.runLater(() -> replaySlider.setValue(newValue.doubleValue()));
-      }
-    });
-
-    //If the recording isn't playing, let the user skip to a time
-    replaySlider.valueChangingProperty().addListener((observable, oldValue, newValue) -> {
-      if (ntRecorder.playbackIsPaused() && !newValue && oldValue) {
-        enablePlayback();
-        ntRecorder.setReplayPercentage(replaySlider.getValue());
-      }
-    });
+  private void displayGraph(String key) {
+    Stage stage = new Stage();
+    stage.initStyle(StageStyle.DECORATED);
+    stage.setAlwaysOnTop(true);
+    FXMLLoader loader = new FXMLLoader(
+        MainWindowController.class.getResource("/edu/wpi/first/outlineviewer/view/ntGraph.fxml"));
+    try {
+      Pane pane = loader.load();
+      NetworkTableGraphController controller = loader.getController();
+      controller.graphEntry(key);
+      stage.setScene(new Scene(pane));
+      stage.show();
+    } catch (IOException e) {
+      e.printStackTrace();
+    }
   }
 
   /**
@@ -300,7 +278,7 @@ public class MainWindowController {
         stringArray, numberArray, boolArray,
         new SeparatorMenuItem(),
         raw
-        );
+    );
   }
 
   /**
@@ -368,61 +346,6 @@ public class MainWindowController {
         alert.showAndWait();
       }
     }
-  }
-
-  @FXML
-  private void startNTRecord() {
-    ntRecorder.start();
-  }
-
-  @FXML
-  private void saveNTRecord() {
-    try {
-      ntRecorder.saveAndJoin(root.getScene().getWindow());
-    } catch (IOException | InterruptedException e) {
-      LoggerUtilities.getLogger().log(Level.SEVERE, "Unable to save NetworkTables recording");
-    }
-  }
-
-  @FXML
-  private void loadNTRecord() {
-    FileChooser fileChooser = new FileChooser();
-    fileChooser.setTitle("Load NetworkTables Recording");
-    fileChooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("NetworkTables Recording",
-        "*" + NetworkTableRecorder.NTR_EXTENSION));
-    File selected = fileChooser.showOpenDialog(root.getScene().getWindow());
-    if (selected != null) {
-      ntRecorder.load(selected, root.getScene().getWindow());
-    }
-  }
-
-  @FXML
-  private void playPauseNTRecord() {
-    if (ntRecorder.playbackIsRunning()) {
-      if (ntRecorder.playbackIsPaused()) {
-        enablePlayback();
-      } else {
-        disablePlayback();
-      }
-    }
-  }
-
-  private void enablePlayback() {
-    replaySlider.setDisable(true);
-    ntRecorder.unpausePlayback();
-    playPauseButton.setGraphic(FONTAWESOME_PLAY);
-  }
-
-  private void disablePlayback() {
-    replaySlider.setDisable(false);
-    ntRecorder.pausePlayback();
-    playPauseButton.setGraphic(FONTAWESOME_PAUSE);
-  }
-
-  @FXML
-  private void rewindNTRecord() {
-    //Rewind glyph is set in the FXML file
-    ntRecorder.rewindPlayback();
   }
 
   @FXML

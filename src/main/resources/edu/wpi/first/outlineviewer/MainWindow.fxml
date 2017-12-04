@@ -2,28 +2,20 @@
 
 <?import edu.wpi.first.outlineviewer.view.NetworkTableTree?>
 <?import java.net.URL?>
-<?import javafx.geometry.Insets?>
-<?import javafx.scene.control.Button?>
 <?import javafx.scene.control.Menu?>
 <?import javafx.scene.control.MenuBar?>
 <?import javafx.scene.control.MenuItem?>
 <?import javafx.scene.control.SeparatorMenuItem?>
-<?import javafx.scene.control.Slider?>
 <?import javafx.scene.control.TreeItem?>
 <?import javafx.scene.control.TreeTableColumn?>
 <?import javafx.scene.layout.BorderPane?>
-<?import javafx.scene.layout.HBox?>
 <?import javafx.scene.layout.VBox?>
-<?import org.controlsfx.glyphfont.Glyph?>
 <BorderPane id="root" fx:id="root" maxHeight="16000" maxWidth="16000" minHeight="400" minWidth="600" prefHeight="400.0" prefWidth="600.0" xmlns="http://javafx.com/javafx/8.0.121" xmlns:fx="http://javafx.com/fxml/1" fx:controller="edu.wpi.first.outlineviewer.controller.MainWindowController">
     <top>
         <MenuBar BorderPane.alignment="CENTER">
             <Menu id="fileMenu" mnemonicParsing="false" text="File">
                 <MenuItem id="loadStateButton" accelerator="SHORTCUT+O" onAction="#loadState" text="Load state" />
                 <MenuItem id="saveStateButton" accelerator="SHORTCUT+S" onAction="#saveState" text="Save state" />
-                <MenuItem id="startNTRecordButton" accelerator="SHORTCUT+E" onAction="#startNTRecord" text="Start Recording" />
-                <MenuItem id="saveNTRecordButton" accelerator="SHORTCUT+R" onAction="#saveNTRecord" text="Save Recording" />
-                <MenuItem id="loadNTRecordButton" accelerator="SHORTCUT+F" onAction="#loadNTRecord" text="Load Recording" />
                 <SeparatorMenuItem />
                 <MenuItem id="preferencesMenuButton" accelerator="SHORTCUT+," onAction="#showPreferences" text="Preferences" />
                 <MenuItem id="exitMenuButton" accelerator="SHORTCUT+q" onAction="#exitProgram" text="Exit" />
@@ -43,29 +35,6 @@
     <bottom>
         <VBox alignment="CENTER">
             <fx:include id="connectionIndicator" source="ConnectionIndicator.fxml" />
-            <HBox id="playerHBox" fx:id="playerHBox" alignment="CENTER" spacing="5">
-            <Button fx:id="playPauseButton" mnemonicParsing="false" onAction="#playPauseNTRecord">
-                <graphic>
-                    <Glyph fontFamily="FontAwesome" icon="play" />
-                </graphic>
-            </Button>
-            <Button fx:id="rewindNTRecordButton" layoutX="207.0" layoutY="10.0" mnemonicParsing="false" onAction="#rewindNTRecord">
-                <graphic>
-                    <Glyph fontFamily="FontAwesome" icon="fast_backward" />
-                </graphic>
-            </Button>
-                <Slider id="replaySlider" fx:id="replaySlider" HBox.hgrow="ALWAYS">
-                    <padding>
-                        <Insets bottom="5.0" left="5.0" right="5.0" />
-                    </padding>
-                </Slider>
-            <VBox.margin>
-               <Insets />
-            </VBox.margin>
-            <padding>
-               <Insets bottom="5.0" left="5.0" right="5.0" top="5.0" />
-            </padding>
-            </HBox>
         </VBox>
 
     </bottom>
