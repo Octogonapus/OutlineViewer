@@ -42,7 +42,7 @@ public class NetworkTableGraphController implements Initializable {
     xAxis.setTickUnit(XAXIS_DIV);
     xAxis.setMinorTickVisible(false);
     xAxis.setOnScroll(event -> {
-      xAxis.setLowerBound(xAxis.getLowerBound() + event.getDeltaY());
+      xAxis.setUpperBound(xAxis.getUpperBound() - event.getDeltaY());
       textFieldGraphViewWidth.setText(
           String.valueOf(xAxis.getUpperBound() - xAxis.getLowerBound()));
     });
