@@ -1,5 +1,6 @@
 package edu.wpi.first.outlineviewer.controller;
 
+import com.google.common.base.Throwables;
 import com.google.common.primitives.Bytes;
 import edu.wpi.first.networktables.NetworkTableEntry;
 import edu.wpi.first.networktables.NetworkTableValue;
@@ -216,9 +217,11 @@ public class MainWindowController {
       NetworkTableGraphController controller = loader.getController();
       controller.graphEntry(key);
       stage.setScene(new Scene(pane));
+      stage.setOnCloseRequest(event -> controller.stop());
       stage.show();
     } catch (IOException e) {
-      e.printStackTrace();
+      LoggerUtilities.getLogger().log(Level.WARNING,
+          "Could not load graph.\n" + Throwables.getStackTraceAsString(e));
     }
   }
 
