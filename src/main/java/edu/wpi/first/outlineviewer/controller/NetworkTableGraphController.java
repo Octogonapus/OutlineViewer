@@ -53,12 +53,12 @@ public class NetworkTableGraphController implements Initializable {
     xAxis.setOnScroll(event -> {
       xAxis.setUpperBound(xAxis.getUpperBound() - event.getDeltaY());
       textFieldGraphViewWidth.setText(
-          String.valueOf(xAxis.getUpperBound() - xAxis.getLowerBound()));
+          String.valueOf((int) (xAxis.getUpperBound() - xAxis.getLowerBound())));
     });
 
-    yAxis.setAutoRanging(false);
+    yAxis.setAutoRanging(true);
     yAxis.setLowerBound(0);
-    yAxis.setUpperBound(30);
+    yAxis.setUpperBound(100);
     yAxis.setTickUnit(10);
     yAxis.setMinorTickVisible(false);
 
@@ -142,21 +142,28 @@ public class NetworkTableGraphController implements Initializable {
    * @param value Value of data
    */
   private void addToSeries(LineChart.Series<Number, Number> series, Long time, Number value) {
-    Long diff = time - startTime;
-    Platform.runLater(() -> series.getData().add(new LineChart.Data<>(diff, value)));
+    Long newTime = time - startTime;
+    Platform.runLater(() -> series.getData().add(new LineChart.Data<>(newTime, value)));
+
+    //ObservableList<XYChart.Data<Number, Number>> data = series.getData();
+    //for (int i = 0; i < data.size(); i++) {
+    //  if (data.get(i).getXValue().doubleValue() < xAxis.getLowerBound()) {
+    //    series.getData().remove(i);
+    //  }
+    //}
 
     //Trim the end of the plot
-    if (series.getData().size() > xAxisWindowLength) {
-      xAxis.setLowerBound(xAxis.getLowerBound() + 1);
-      xAxis.setUpperBound(diff);
+    if (newTime > xAxis.getUpperBound() || updateFromTextField) {
+      xAxis.setLowerBound(xAxis.getLowerBound() + XAXIS_DIV);
+      xAxis.setUpperBound(newTime);
 
       //If the view size update came from the text field, not from the scroll wheel
       if (updateFromTextField) {
         updateFromTextField = false;
         try {
-          if ((int) (diff - xAxis.getLowerBound()) //NOPMD
-              != Integer.parseInt(textFieldGraphViewWidth.getText())) {
-            xAxis.setLowerBound(diff - Double.parseDouble(textFieldGraphViewWidth.getText()));
+          if ((int) (xAxis.getUpperBound() - xAxis.getLowerBound()) //NOPMD
+              != (int) Double.parseDouble(textFieldGraphViewWidth.getText())) {
+            xAxis.setLowerBound(newTime - Double.parseDouble(textFieldGraphViewWidth.getText()));
           }
         } catch (NumberFormatException e) {
           LoggerUtilities.getLogger().log(Level.INFO,
