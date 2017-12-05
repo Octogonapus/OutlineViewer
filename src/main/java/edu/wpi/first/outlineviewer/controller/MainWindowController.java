@@ -209,6 +209,7 @@ public class MainWindowController {
   private void displayGraph(String key) {
     Stage stage = new Stage();
     stage.initStyle(StageStyle.DECORATED);
+    stage.initOwner(root.getScene().getWindow());
     stage.setAlwaysOnTop(true);
     FXMLLoader loader = new FXMLLoader(
         MainWindowController.class.getResource("/edu/wpi/first/outlineviewer/view/ntGraph.fxml"));
