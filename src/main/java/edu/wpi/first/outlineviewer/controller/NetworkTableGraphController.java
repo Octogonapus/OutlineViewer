@@ -124,6 +124,7 @@ public class NetworkTableGraphController implements Initializable {
     entries.forEach(entry -> {
       if (!seriesMap.containsKey(entry)) {
         LineChart.Series<Number, Number> series = new LineChart.Series<>();
+        series.setName(entry);
         Platform.runLater(() -> lineChart.getData().add(series));
         seriesMap.put(entry, series);
       }
